@@ -267,11 +267,15 @@ def handle_internship_offer():
             duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=3)
 
             calculated_end_date = start_date + relativedelta(months=+duration)
+
+            # Checkbox to override end date
             override = st.checkbox("Manually set end date?")
+
+            # If override is checked, allow manual input; else show disabled auto-calculated date
             if override:
-                end_date = st.date_input("End Date", value=calculated_end_date)
+                end_date = st.date_input("End Date", value=calculated_end_date, key="manual_end_date")
             else:
-                st.date_input("End Date", value=calculated_end_date, disabled=True)
+                st.date_input("End Date", value=calculated_end_date, disabled=True, key="auto_end_date")
                 end_date = calculated_end_date
 
             # stipend_input = st.text_input("Stipend (write out digits, no commas or dot)", placeholder="15000")
