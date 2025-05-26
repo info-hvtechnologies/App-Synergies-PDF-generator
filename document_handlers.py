@@ -265,7 +265,7 @@ def handle_internship_offer():
 
             start_date = st.date_input("Start Date", value=datetime.now().date())
             duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=3)
-            end_date = st.date_input("Start Date", value=datetime.now().date())
+            end_date = st.date_input("End Date")
 
             if st.form_submit_button("Generate Certificate"):
                 if not name.strip():
