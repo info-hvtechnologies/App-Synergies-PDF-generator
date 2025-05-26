@@ -172,11 +172,20 @@ def pdf_view(file_input):
         with pdfplumber.open(file_input) as pdf:
             st.subheader("Preview")
             for i, page in enumerate(pdf.pages):
-                st.image(
-                    page.to_image(resolution=150).original,
-                    caption=f"Page {i + 1}",
-                    use_column_width=True
-                )
+                if LOAD_LOCALLY:
+                    st.image(
+                        page.to_image(resolution=150).original,
+                        caption=f"Page {i + 1}",
+                        use_column_width=True
+                        #use_container_width
+                    )
+                else:
+                    st.image(
+                        page.to_image(resolution=150).original,
+                        caption=f"Page {i + 1}",
+                        use_container_width=True
+                        # use_container_width
+                    )
     except Exception as e:
         st.warning(f"Couldn't generate PDF preview: {str(e)}")
 
