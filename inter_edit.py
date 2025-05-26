@@ -21,13 +21,13 @@ def internship_edit(input_path, output_path, context):
     print(f"{output_path} has been created!")
 
 
-replacements_docx = {
-                "date": "22-3-1290",
-                "start_date": "22-3-1290",
-                "end_date": "22-3-1290",
-                "intern_name": "Diddy",
-                "designation": "General Manager",
-                "m": "9",
-            }
-internship_edit("app_int_5.docx", "wowo_5.docx", replacements_docx)
-
+# replacements_docx = {
+#                 "date": "22-3-1290",
+#                 "start_date": "22-3-1290",
+#                 "end_date": "22-3-1290",
+#                 "intern_name": "Diddy",
+#                 "designation": "General Manager",
+#                 "m": "9",
+#             }
+# internship_edit("app_int_5.docx", "wowo_5.docx", replacements_docx)
+#
