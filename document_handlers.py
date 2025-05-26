@@ -21,7 +21,7 @@ from invoice_editor import invoice_edit
 from testimonial_page_edit import EditTextFile
 import re
 
-LOAD_LOCALLY = True
+LOAD_LOCALLY = False
 
 
 def format_currency_amount(raw_price: str) -> str:
