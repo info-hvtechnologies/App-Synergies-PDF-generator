@@ -684,7 +684,7 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
                                 firestore_db.collection("generated_files").document(doc_id).delete()
 
                                 st.success("Document deleted successfully")
-                                st.experimental_rerun()
+                                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
                             except Exception as e:
                                 st.error(f"Error deleting document: {str(e)}")
 
