@@ -82,11 +82,11 @@ def cleanup_broken_metadata():
     """Check for and remove Firestore documents that reference non-existent storage blobs"""
     try:
         # Get all document types (e.g., Proposal, NDA, etc.)
-        doc_types = firestore_db.collection("hvt_generator").stream()
+        doc_types = firestore_db.collection("AS_DOC_Gen").stream()
 
         for doc_type in doc_types:
             # Get all templates for this document type
-            templates_ref = firestore_db.collection("hvt_generator").document(doc_type.id).collection("templates")
+            templates_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type.id).collection("templates")
             docs = templates_ref.stream()
 
             for doc in docs:
@@ -150,8 +150,8 @@ DOCUMENT_TYPES = [
 
 # Sidebar - Navigation and logout
 # Add "History" to the list if admin is logged in
-# if st.session_state.get('is_admin', False):
-#     DOCUMENT_TYPES.insert(-1, "History")
+if st.session_state.get('is_admin', False):
+    DOCUMENT_TYPES.insert(-1, "History")
 
 # st.sidebar.title("📑 Navigation")
 st.sidebar.title("📑 Menu")
@@ -320,11 +320,18 @@ if selected_option == "Admin Panel":
                 with pdfplumber.open(pdf_path) as pdf:
                     for i, page in enumerate(pdf.pages):
                         preview_image = page.to_image(resolution=100)
-                        st.image(
-                            preview_image.original,
-                            caption=f"Page {i + 1}",
-                            use_column_width=True
-                        )
+                        if LOAD_LOCALLY:
+                            st.image(
+                                preview_image.original,
+                                caption=f"Page {i + 1}",
+                                use_column_width=True
+                            )
+                        else:
+                            st.image(
+                                preview_image.original,
+                                caption=f"Page {i + 1}",
+                                use_container_width=True
+                            )
             except Exception as e:
                 st.warning(f"Could not preview PDF: {str(e)}")
 
@@ -432,7 +439,7 @@ if selected_option == "Admin Panel":
                                 if st.button(preview_button_label, key=f"preview_toggle_{doc_id}"):
                                     st.session_state[f"show_preview_{doc_id}"] = not st.session_state[
                                         f"show_preview_{doc_id}"]
-                                    st.experimental_rerun()
+                                    st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
                             # Preview section (conditionally shown)
                             if st.session_state[f"show_preview_{doc_id}"] and template_data[
@@ -511,389 +518,21 @@ if selected_option == "Admin Panel":
         with tab1:
             show_templates_tab("Internship Certificate")
 
-        with tab2:
-            show_templates_tab("NDA")
-
-        with tab3:
-            show_templates_tab("Invoice")
-
-        with tab4:
-            show_templates_tab("Contract")
-
-        with tab5:
-            show_templates_tab("Proposal")
+        # with tab2:
+        #     show_templates_tab("NDA")
+        #
+        # with tab3:
+        #     show_templates_tab("Invoice")
+        #
+        # with tab4:
+        #     show_templates_tab("Contract")
+        #
+        # with tab5:
+        #     show_templates_tab("Proposal")
 
         with tab6:
             manage_internship_roles_tab()
 
-
-# if selected_option == "Admin Panel":
-#     st.title("🔐 Admin Panel")
-#
-#     if not st.session_state.is_admin:
-#         # Login form
-#         with st.form("admin_login_form"):
-#             admin_user = st.text_input("Admin Email")
-#             admin_pass = st.text_input("Password", type="password")
-#             login = st.form_submit_button("Login")
-#
-#             if login:
-#                 if admin_login(admin_user, admin_pass):
-#                     st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
-#     else:
-#         # Admin dashboard
-#         st.success(f"Welcome Admin! ({st.session_state.user['email']})")
-#
-#         # Admin panel content
-#         st.header("📁 Template Management")
-#         st.subheader("Upload New Templates")
-#
-#         # Template upload section
-#         with st.expander("➕ Upload Template", expanded=True):
-#             doc_type = st.selectbox(
-#                 "Select Document Type",
-#                 ["Internship Offer", "NDA", "Invoice", "Contract", "Proposal"],
-#                 key="doc_type_select"
-#             )
-#
-#             uploaded_file = st.file_uploader(
-#                 f"Upload {doc_type} Template",
-#                 type=["docx", "pdf"],
-#                 key=f"upload_{doc_type}"
-#             )
-#
-#             if uploaded_file:
-#                 # Additional fields for all templates
-#                 with st.form("template_details_form"):
-#                     visibility = st.radio(
-#                         "Visibility",
-#                         ["Public", "Private"],
-#                         help="Public templates can be accessed by all users"
-#                     )
-#
-#                     description = st.text_area("Template Description")
-#
-#                     # Additional fields for Proposal
-#                     if doc_type == "Proposal":
-#                         proposal_subdir = st.selectbox(
-#                             "Proposal Template Category",
-#                             ["Cover Page", "Table of Contents", "Business Requirement", "Page 3 to 6", "Testimonials"],
-#                             help="Choose which part of the proposal this template belongs to"
-#                         )
-#
-#                         subdir_map = {
-#                             "Cover Page": "cover_page",
-#                             "Table of Contents": "table_of_contents",
-#                             "Business Requirement": "business_requirement",
-#                             "Page 3 to 6": "page_3_6",
-#                             "Testimonials": "testimonials"
-#                         }
-#                         normalized_subdir = subdir_map[proposal_subdir]
-#
-#                         # Additional fields for Proposal templates
-#                         # is_pdf = st.checkbox("Is this a PDF template?")
-#                         pdf_name = st.text_input("Name of PDF (if applicable)")
-#                         num_pages = st.number_input("BR Pages Number", min_value=1, value=1)
-#
-#                     if st.form_submit_button("Save Template"):
-#                         try:
-#                             # Generate standardized filename
-#                             template_ref = firestore_db.collection("hvt_generator").document(doc_type)
-#
-#                             # count = len([doc.id for doc in template_ref.collection("templates").get()])
-#                             count = len([doc.id for doc in template_ref.collection(
-#                                 normalized_subdir if doc_type == "Proposal" else "templates").get()])
-#
-#                             order_number = count + 1
-#                             file_extension = uploaded_file.name.split('.')[-1]
-#                             new_filename = f"template{order_number}.{file_extension}"
-#
-#                             # Define storage paths
-#                             if doc_type == "Proposal":
-#                                 storage_path = f"hvt_generator/Proposal/{normalized_subdir}/{new_filename}"
-#                             else:
-#                                 storage_path = f"hvt_generator/{doc_type.lower().replace(' ', '_')}/templates/{new_filename}"
-#
-#                             # Upload to Firebase Storage
-#                             blob = bucket.blob(storage_path)
-#                             blob.upload_from_string(
-#                                 uploaded_file.getvalue(),
-#                                 content_type=uploaded_file.type
-#                             )
-#
-#                             # Generate download URL
-#                             download_url = blob.generate_signed_url(
-#                                 expiration=datetime.timedelta(days=365 * 10),  # 10 year expiration
-#                                 version="v4"
-#                             ) if visibility == "Private" else blob.public_url
-#
-#                             # Prepare metadata
-#                             file_details = {
-#                                 "name": new_filename,
-#                                 "original_name": uploaded_file.name,
-#                                 "doc_type": doc_type,
-#                                 "file_type": uploaded_file.type,
-#                                 "size_kb": f"{len(uploaded_file.getvalue()) / 1024:.1f}",
-#                                 "size_bytes": len(uploaded_file.getvalue()),
-#                                 "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-#                                 "upload_timestamp": firestore.SERVER_TIMESTAMP,
-#                                 "download_url": download_url,
-#                                 "storage_path": storage_path,
-#                                 "visibility": visibility,
-#                                 "description": description,
-#                                 "order_number": order_number,
-#                                 "is_active": True
-#                             }
-#
-#                             # Add proposal-specific fields if needed
-#                             if doc_type == "Proposal":
-#                                 file_details.update({
-#                                     "template_part": proposal_subdir,
-#                                     "proposal_section_type": normalized_subdir,
-#                                     # "is_pdf": is_pdf,
-#                                     "pdf_name": pdf_name,
-#                                     "num_pages": num_pages
-#                                 })
-#
-#                             # Save to Firestore
-#                             # template_ref.collection("templates").add(file_details)
-#                             if doc_type == "Proposal":
-#                                 template_ref.collection(normalized_subdir).add(file_details)
-#                             else:
-#                                 template_ref.collection("templates").add(file_details)
-#
-#                             # Update the document count
-#                             template_ref.set({
-#                                 "template_count": order_number,
-#                                 "last_updated": firestore.SERVER_TIMESTAMP
-#                             }, merge=True)
-#
-#                             st.success(f"Template saved successfully as {new_filename}!")
-#                             st.markdown(f"**Download Link:** [Click here]({download_url})")
-#
-#                         except Exception as e:
-#                             st.error(f"Error saving template: {str(e)}")
-#                             st.exception(e)
-#
-#         # Template management in tabs
-#         st.subheader("Manage Templates")
-#         from streamlit_sortables import sort_items
-#         import streamlit as st
-#         import pdfplumber
-#
-#
-#         def preview_pdf_all_pages(pdf_path: str):
-#
-#             try:
-#                 with pdfplumber.open(pdf_path) as pdf:
-#                     for i, page in enumerate(pdf.pages):
-#                         preview_image = page.to_image(resolution=100)
-#                         st.image(
-#                             preview_image.original,
-#                             caption=f"Page {i + 1}",
-#                             use_column_width=True
-#                         )
-#             except Exception as e:
-#                 st.warning(f"Could not preview PDF: {str(e)}")
-#
-#
-#         def show_templates_tab(doc_type):
-#             st.subheader(f"{doc_type} Templates")
-#             template_ref = firestore_db.collection("hvt_generator").document(doc_type)
-#
-#             if doc_type == "Proposal":
-#                 # Use section names as Firestore subcollections
-#                 section_map = {
-#                     "Cover Page": "cover_page",
-#                     "Table of Contents": "table_of_contents",
-#                     "Business Requirement": "business_requirement",
-#                     "Page 3 to 6": "page_3_6",
-#                     "Testimonials": "testimonials"
-#                 }
-#
-#                 for section_label, section_key in section_map.items():
-#                     st.markdown(f"### 📂 {section_label}")
-#                     templates = template_ref.collection(section_key).order_by("order_number").get()
-#
-#                     if not templates:
-#                         st.info(f"No templates in {section_label}")
-#                         continue
-#
-#                     for template_doc in templates:
-#                         template_data = template_doc.to_dict()
-#                         doc_id = template_doc.id
-#
-#                         # Initialize session state for edit mode and preview
-#                         if f"edit_mode_{doc_id}" not in st.session_state:
-#                             st.session_state[f"edit_mode_{doc_id}"] = False
-#                         if f"show_preview_{doc_id}" not in st.session_state:
-#                             st.session_state[f"show_preview_{doc_id}"] = False
-#
-#                         with st.expander(
-#                                 f"📄 {template_data.get('original_name', 'Unnamed')} (Order: {template_data['order_number']})"):
-#                             col1, col2 = st.columns([3, 1])
-#                             with col1:
-#                                 # Disabled fields by default, enabled when edit mode is on
-#                                 new_name = st.text_area(
-#                                     "PDF Name",
-#                                     value=template_data.get("pdf_name", ""),
-#                                     key=f"pdf_name_{doc_id}",
-#                                     disabled=not st.session_state[f"edit_mode_{doc_id}"]
-#                                 )
-#                                 new_num_pages = st.number_input(
-#                                     "BR pages number",
-#                                     min_value=1,
-#                                     value=int(template_data.get("num_pages", 1)),
-#                                     key=f"num_pages_{doc_id}",
-#                                     disabled=not st.session_state[f"edit_mode_{doc_id}"]
-#                                 )
-#                                 new_desc = st.text_area(
-#                                     "Description",
-#                                     value=template_data.get("description", ""),
-#                                     key=f"desc_{doc_id}",
-#                                     disabled=not st.session_state[f"edit_mode_{doc_id}"]
-#                                 )
-#                                 new_vis = st.selectbox(
-#                                     "Visibility",
-#                                     ["Public", "Private"],
-#                                     index=["Public", "Private"].index(template_data.get("visibility", "Public")),
-#                                     key=f"vis_{doc_id}",
-#                                     disabled=not st.session_state[f"edit_mode_{doc_id}"]
-#                                 )
-#
-#                             with col2:
-#                                 # Delete button
-#                                 if st.button("🗑️ Delete Template", key=f"delete_{doc_id}"):
-#                                     try:
-#                                         blob = bucket.blob(template_data['storage_path'])
-#                                         blob.delete()
-#                                         template_ref.collection(section_key).document(doc_id).delete()
-#                                         st.success("Template deleted successfully")
-#                                         st.experimental_rerun()
-#                                     except Exception as e:
-#                                         st.error(f"Error deleting: {e}")
-#
-#                                 # Edit toggle button
-#                                 edit_button_label = "✏️ Edit" if not st.session_state[
-#                                     f"edit_mode_{doc_id}"] else "✏️ Editing"
-#                                 if st.button(edit_button_label, key=f"edit_toggle_{doc_id}"):
-#                                     st.session_state[f"edit_mode_{doc_id}"] = not st.session_state[
-#                                         f"edit_mode_{doc_id}"]
-#                                     st.experimental_rerun()
-#
-#                                 # Save button (only shown in edit mode)
-#                                 if st.session_state[f"edit_mode_{doc_id}"]:
-#                                     if st.button("💾 Save Changes", key=f"save_{doc_id}"):
-#                                         template_ref.collection(section_key).document(doc_id).update({
-#                                             "description": new_desc,
-#                                             "visibility": new_vis,
-#                                             "pdf_name": new_name,
-#                                             "num_pages": new_num_pages
-#                                         })
-#                                         st.session_state[f"edit_mode_{doc_id}"] = False
-#                                         st.success("Metadata updated successfully")
-#                                         st.experimental_rerun()
-#
-#                                 # Preview toggle button
-#                                 preview_button_label = "👁️ Show Preview" if not st.session_state[
-#                                     f"show_preview_{doc_id}"] else "👁️ Hide Preview"
-#                                 if st.button(preview_button_label, key=f"preview_toggle_{doc_id}"):
-#                                     st.session_state[f"show_preview_{doc_id}"] = not st.session_state[
-#                                         f"show_preview_{doc_id}"]
-#                                     st.experimental_rerun()
-#
-#                             # Preview section (conditionally shown)
-#                             if st.session_state[f"show_preview_{doc_id}"] and template_data[
-#                                 'file_type'] == 'application/pdf' and template_data['visibility'] == 'Public':
-#                                 try:
-#                                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-#                                         blob = bucket.blob(template_data['storage_path'])
-#                                         blob.download_to_filename(tmp_file.name)
-#                                         preview_pdf_all_pages(tmp_file.name)
-#                                 except Exception as e:
-#                                     st.warning(f"❌ Skipping missing or broken preview: {str(e)}")
-#
-#                             st.markdown(
-#                                 f"**Download:** [{template_data['original_name']}]({template_data['download_url']})")
-#
-#             else:
-#                 # Rest of your code for non-Proposal templates remains the same
-#                 templates = template_ref.collection("templates").order_by("order_number").get()
-#                 if not templates:
-#                     st.info("No templates found.")
-#                     return
-#
-#                 for template_doc in templates:
-#                     template_data = template_doc.to_dict()
-#                     doc_id = template_doc.id
-#
-#                     with st.expander(
-#                             f"📄 {template_data.get('original_name', 'Unnamed')} (Order: {template_data['order_number']})"):
-#                         col1, col2 = st.columns([3, 1])
-#                         with col1:
-#                             new_desc = st.text_area("Edit Description", value=template_data.get("description", ""),
-#                                                     key=f"desc_{doc_id}")
-#                             new_vis = st.selectbox("Visibility", ["Public", "Private"],
-#                                                    index=["Public", "Private"].index(
-#                                                        template_data.get("visibility", "Public")), key=f"vis_{doc_id}")
-#                             if st.button("💾 Save Changes", key=f"save_{doc_id}"):
-#                                 template_ref.collection("templates").document(doc_id).update({
-#                                     "description": new_desc,
-#                                     "visibility": new_vis
-#                                 })
-#                                 st.success("Metadata updated successfully")
-#                                 st.experimental_rerun()
-#
-#                         with col2:
-#                             if st.button("🗑️ Delete Template", key=f"delete_{doc_id}"):
-#                                 try:
-#                                     blob = bucket.blob(template_data['storage_path'])
-#                                     blob.delete()
-#                                     template_ref.collection("templates").document(doc_id).delete()
-#                                     st.success("Template deleted successfully")
-#                                     st.experimental_rerun()
-#                                 except Exception as e:
-#                                     st.error(f"Error deleting: {e}")
-#
-#                         if template_data['file_type'] == 'application/pdf' and template_data['visibility'] == 'Public':
-#                             try:
-#                                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-#                                     blob = bucket.blob(template_data['storage_path'])
-#                                     blob.download_to_filename(tmp_file.name)
-#                                     preview_pdf_all_pages(tmp_file.name)
-#                             except Exception as e:
-#                                 st.warning(f"❌ Skipping missing or broken preview: {str(e)}")
-#
-#                         st.markdown(
-#                             f"**Download:** [{template_data['original_name']}]({template_data['download_url']})")
-#
-#
-#         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-#             ["Internship Offer",
-#              "NDA",
-#              "Invoice",
-#              "Contract",
-#              "Proposal",
-#              "Internship Positions"
-#              ])
-#
-#         with tab1:
-#             show_templates_tab("Internship Offer")
-#
-#         with tab2:
-#             show_templates_tab("NDA")
-#
-#         with tab3:
-#             show_templates_tab("Invoice")
-#
-#         with tab4:
-#             show_templates_tab("Contract")
-#
-#         with tab5:
-#             show_templates_tab("Proposal")
-#
-#         with tab6:
-#             manage_internship_roles_tab()
 
 
 elif selected_option == "History" and st.session_state.get('is_admin', False):
@@ -914,44 +553,23 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
             with pdfplumber.open(file_input) as pdf:
                 st.subheader("Preview")
                 for i, page in enumerate(pdf.pages):
-                    st.image(
-                        page.to_image(resolution=150).original,
-                        caption=f"Page {i + 1}",
-                        use_column_width=True
-                    )
+                    if LOAD_LOCALLY:
+                        st.image(
+                            page.to_image(resolution=150).original,
+                            caption=f"Page {i + 1}",
+                            use_column_width=True
+                        )
+                    else:
+                        st.image(
+                            page.to_image(resolution=150).original,
+                            caption=f"Page {i + 1}",
+                            use_container_width=True
+                        )
+                    # AS_DOC_Gen
+
         except Exception as e:
             st.warning(f"Couldn't generate PDF preview: {str(e)}")
 
-
-    from docx import Document
-
-
-    def docx_preview(docx_path, max_chars=3000):
-        """
-        Displays a simple preview of a .docx file by extracting and showing its text content.
-
-        Parameters:
-            docx_path (str): Path to the .docx file.
-            max_chars (int): Maximum number of characters to display.
-        """
-        try:
-            if not os.path.exists(docx_path):
-                st.error(f"File not found: {docx_path}")
-                return
-
-            doc = Document(docx_path)
-            text = '\n'.join([para.text for para in doc.paragraphs])
-
-            if not text.strip():
-                st.warning("The document appears to be empty.")
-            else:
-                preview_text = text[:max_chars] + (
-                    "..." if len(text) > max_chars else "")
-                st.subheader("📄 DOCX Preview")
-                st.code(preview_text, language='markdown')
-
-        except Exception as e:
-            st.error(f"Could not preview DOCX: {str(e)}")
 
 
     def display_documents_by_type(doc_type):
@@ -1097,14 +715,14 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
 elif selected_option == "Internship Certificate":
     handle_internship_offer()
 
-elif selected_option == "NDA":
-    handle_nda()
-
-elif selected_option == "Invoice":
-    handle_invoice()
-
-elif selected_option == "Contract":
-    handle_contract()
-
-elif selected_option == "Proposal":
-    handle_proposal()
+# elif selected_option == "NDA":
+#     handle_nda()
+#
+# elif selected_option == "Invoice":
+#     handle_invoice()
+#
+# elif selected_option == "Contract":
+#     handle_contract()
+#
+# elif selected_option == "Proposal":
+#     handle_proposal()

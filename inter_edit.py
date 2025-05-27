@@ -29,5 +29,5 @@ def internship_edit(input_path, output_path, context):
 #                 "designation": "General Manager",
 #                 "m": "9",
 #             }
-# internship_edit("app_int_5.docx", "wowo_5.docx", replacements_docx)
-#
+# internship_edit("app_int_7.docx", "wowo_7.docx", replacements_docx)
+
