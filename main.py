@@ -597,7 +597,8 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
 
             for doc_id, data in filtered_docs:
                 with st.expander(
-                        f"📄 {data.get('name', data.get('client_name', 'Unnamed Document'))} - {data.get('upload_date', '')}"):
+                        f"📄 {data.get('name', data.get('client_name', data.get('intern_name', 'Unnamed Document')))} - {data.get('upload_date', '')}"):
+
                     col1, col2 = st.columns([3, 1])
 
                     # Unique preview toggle key
