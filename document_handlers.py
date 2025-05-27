@@ -403,7 +403,7 @@ def handle_internship_offer():
 
                 with col2:
                     st.write(f"**Duration:** {st.session_state.offer_data['duration']} months")
-                    st.write(f"**End Date:** ₹{context['end_date']}")
+                    st.write(f"**End Date:** {context['end_date']}")
                     # st.write(f"**First Paycheck:** {context['first_paycheque_date']}")
 
                 pdf_view(pdf_output)
