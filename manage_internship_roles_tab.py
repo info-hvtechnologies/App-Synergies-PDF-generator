@@ -2,6 +2,8 @@ import json
 import os
 import streamlit as st
 
+LOAD_LOCALLY = False
+
 JSON_PATH = "roles.json"
 
 
@@ -37,7 +39,7 @@ def manage_internship_roles_tab():
             roles.append(new_role.strip())
             save_roles(roles)
             st.success(f"'{new_role}' added.")
-            st.experimental_rerun()
+            st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
     # st.divider()
     st.markdown("---")
@@ -65,7 +67,7 @@ def manage_internship_roles_tab():
                         roles[i] = updated_role.strip()
                         save_roles(roles)
                         col1.success("Saved ✅")
-                        st.experimental_rerun()
+                        st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
             with col3:
                 st.markdown("<div style='height: 1.9em;'></div>", unsafe_allow_html=True)
@@ -73,4 +75,4 @@ def manage_internship_roles_tab():
                     roles = delete_role(roles, role)
                     save_roles(roles)
                     st.success(f"Deleted: {role}")
-                    st.experimental_rerun()
+                    st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
