@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import streamlit as st
 from dotenv import load_dotenv
 from firebase_conf import auth, rt_db, bucket, firestore_db
-from document_handlers import handle_internship_offer, handle_nda, handle_invoice, handle_contract, handle_proposal
+from document_handlers import handle_internship_certificate, handle_internship_offer, handle_invoice, handle_contract, handle_proposal
 from google.cloud import firestore
 from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 import tempfile
@@ -141,7 +141,7 @@ def admin_login(email, password):
 # Document types
 DOCUMENT_TYPES = [
     "Internship Certificate",
-    # "NDA",
+    "Internship Offer",
     # "Invoice",
     # "Contract",
     # "Proposal",
@@ -194,7 +194,7 @@ if selected_option == "Admin Panel":
             # )
             doc_type = st.selectbox(
                 "Select Document Type",
-                ["Internship Certificate"],
+                ["Internship Certificate", "Internship Offer"],
                 key="doc_type_select"
             )
 
@@ -519,9 +519,9 @@ if selected_option == "Admin Panel":
         #      # "Proposal",
         #      "Internship Positions"
         #      ])
-        tab1, tab2 = st.tabs(
+        tab1, tab2, tab3 = st.tabs(
             ["Internship Certificate",
-             # "NDA",
+             "Internship Offer",
              # "Invoice",
              # "Contract",
              # "Proposal",
@@ -533,8 +533,8 @@ if selected_option == "Admin Panel":
         with tab1:
             show_templates_tab("Internship Certificate")
 
-        # with tab2:
-        #     show_templates_tab("NDA")
+        with tab2:
+            show_templates_tab("Internship Offer")
         #
         # with tab3:
         #     show_templates_tab("Invoice")
@@ -545,7 +545,7 @@ if selected_option == "Admin Panel":
         # with tab5:
         #     show_templates_tab("Proposal")
 
-        with tab2:
+        with tab3:
             manage_internship_roles_tab()
 
 
@@ -563,7 +563,7 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
     # ])
     tab1, tab2 = st.tabs([
         "Internship",
-        "Offer",
+        "Internship Offer",
 
     ])
 
@@ -721,7 +721,7 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
         display_documents_by_type("Internship")
 
     with tab2:
-        display_documents_by_type("Offer")
+        display_documents_by_type("Internship Offer")
 
     # with tab3:
     #     display_documents_by_type("Invoice")
@@ -734,10 +734,10 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
 
 # Handle document types
 elif selected_option == "Internship Certificate":
-    handle_internship_offer()
+    handle_internship_certificate()
 
-# elif selected_option == "NDA":
-#     handle_nda()
+elif selected_option == "Internship Offer":
+    handle_internship_offer()
 #
 # elif selected_option == "Invoice":
 #     handle_invoice()

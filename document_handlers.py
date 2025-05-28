@@ -19,6 +19,7 @@ import random
 from google.cloud import storage, firestore
 from invoice_editor import invoice_edit
 from testimonial_page_edit import EditTextFile
+from offer_editor import offer_edit
 import re
 
 LOAD_LOCALLY = False
@@ -190,6 +191,25 @@ def pdf_view(file_input):
         st.warning(f"Couldn't generate PDF preview: {str(e)}")
 
 
+from num2words import num2words
+
+def currency_to_words_in_inr(formatted_amount: str) -> str:
+    # Remove commas and convert to float
+    try:
+        amount = float(formatted_amount.replace(',', ''))
+    except ValueError:
+        return "Invalid amount"
+
+    # Split into rupees and paise
+    rupees = int(amount)
+    paise = round((amount - rupees) * 100)
+
+    rupees_words = num2words(rupees, lang='en_IN').title() + " Rupees"
+    paise_words = f" and {num2words(paise, lang='en_IN').title()} Paise" if paise else ""
+
+    return rupees_words + paise_words
+
+
 def fetch_and_organize_templates(firestore_db, base_temp_dir=None):
     # Base temp dir
     if not base_temp_dir:
@@ -235,7 +255,7 @@ def fetch_and_organize_templates(firestore_db, base_temp_dir=None):
     return base_temp_dir
 
 
-def handle_internship_offer():
+def handle_internship_certificate():
     st.title("📄 Internship Certificate Form")
 
     # Initialize session state for multi-page form
@@ -256,12 +276,6 @@ def handle_internship_offer():
                 st.error(f"Error loading roles from JSON: {str(e)}")
             positions = data_
             position = st.selectbox("Internship Position", positions, index=0 if positions else None)
-
-            # position = st.selectbox(
-            #     "Internship Position",
-            #     ["UI UX Designer", "AI Automations Developer", "Sales and Marketing"],
-            #     index=0
-            # )
 
             start_date = st.date_input("Start Date", value=datetime.now().date())
             duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=3)
@@ -493,65 +507,89 @@ def handle_internship_offer():
                     st.warning(f"Could not clean up temporary files: {str(e)}")
 
 
-def handle_nda():
-    st.title("📄 NDA Form")
+def handle_internship_offer():
+    st.title("📄 Internship Offer Form")
 
     # Initialize session state for multi-page form
-    if 'nda_form_step' not in st.session_state:
-        st.session_state.nda_form_step = 1
-        st.session_state.nda_data = {}
+    if 'internship_offer_form_step' not in st.session_state:
+        st.session_state.internship_offer_form_step = 1
+        st.session_state.internship_offer_data = {}
 
-    if st.session_state.nda_form_step == 1:
+    if st.session_state.internship_offer_form_step == 1:
         # Step 1: Collect information
-        with st.form("nda_form"):
-            date = st.date_input("Agreement Date")
-            client_name = st.text_input("Client Name")
-            client_company_name = st.text_input("Client Company Name")
-            client_company_address = st.text_area("Client Company Address")
+        with st.form("internship_offer_form"):
+            date = st.date_input("Offer Date")
 
-            if st.form_submit_button("Generate NDA"):
-                st.session_state.nda_data = {
-                    "date": date.strftime("%B %d, %Y"),
-                    "client_name": client_name,
-                    "client_company_name": client_company_name,
-                    "client_company_address": client_company_address
+            intern_name = st.text_input("Name")
+            json_path = "roles.json"
+            try:
+                with open(json_path, "r") as f:
+                    data = json.load(f)
+                    data_ = data.get("internship_position", [])
+            except Exception as e:
+                st.error(f"Error loading roles from JSON: {str(e)}")
+            positions = data_
+            position = st.selectbox("Internship Designation", positions, index=0 if positions else None)
+
+            duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=3)
+            start_date = st.date_input("Start Date", value=datetime.now().date())
+            end_date = st.date_input("End Date", value=datetime.now().date())
+            valid_date = st.date_input("Offer Valid Date", value=datetime.now().date())
+            stipend = st.text_input("Stipend (Figures only)")
+
+            # client_company_name = st.text_input("Client Company Name")
+            # client_company_address = st.text_area("Client Company Address")
+
+            if st.form_submit_button("Generate Offer"):
+                st.session_state.internship_offer_data = {
+                    "date": f"{date.day}/{date.month}/{date.year}",
+                    "intern_name": intern_name,
+                    "position": position,
+                    "duration": duration,
+                    "start_date": f"{start_date.day}/{start_date.month}/{start_date.year}",
+                    "end_date": f"{end_date.day}/{end_date.month}/{end_date.year}",
+                    "valid_date": f"{valid_date.day}/{valid_date.month}/{valid_date.year}",
+                    "amount": format_currency_amount(stipend),
+                    "amount_in_words": currency_to_words_in_inr(format_currency_amount(stipend)),
+
+                    # "client_company_name": client_company_name,
+                    # "client_company_address": client_company_address
                 }
-                st.session_state.nda_form_step = 2
+                st.session_state.internship_offer_form_step = 2
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
-    elif st.session_state.nda_form_step == 2:
+    elif st.session_state.internship_offer_form_step == 2:
         # Step 2: Preview and download
         # st.success("NDA generated successfully!")
         with st.spinner("Loading template and generating offer..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'nda_form_step', 1))
+            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'internship_offer_form_step', 1))
             # 9
-            the_name = st.session_state.nda_data['client_name']
-            space_ = " "
-            if len(the_name) >= 9:
-                lenght_dif = len(the_name) - 9
-                new_text = f"{space_ * lenght_dif}      {the_name}"
-            elif len(the_name) < 9:
-                lenght_dif = 9 - len(the_name)
-                new_text = f"{space_ * lenght_dif}      {the_name}"
-            else:
-                new_text = the_name
+
             # Generate documents
             replacements_docx = {
-                "date": st.session_state.nda_data["date"],
+                "date": st.session_state.internship_offer_data["date"],
+                "start_date": st.session_state.internship_offer_data["start_date"],
+                "end_date": st.session_state.internship_offer_data["end_date"],
+                "name": st.session_state.internship_offer_data["intern_name"],
+                "amount": st.session_state.internship_offer_data["amount"],
+                "amount_in_words": st.session_state.internship_offer_data["amount_in_words"],
+                "valid_date": st.session_state.internship_offer_data["valid_date"],
+                "designation": st.session_state.internship_offer_data["position"],
+                "m": st.session_state.internship_offer_data["duration"],
                 # "client_name": f" {st.session_state.nda_data['client_name']}",
-                "client_name": new_text,
-                "client_company_name": st.session_state.nda_data["client_company_name"],
-                "client_company_address": st.session_state.nda_data["client_company_address"]
+                # "client_name": new_text,
+                # "client_company_name": st.session_state.nda_data["client_company_name"],
+                # "client_company_address": st.session_state.nda_data["client_company_address"]
             }
 
             # Get template from Firestore
-            doc_type = "NDA"  # Changed to match your collection name
+            doc_type = "Internship Offer"  # Changed to match your collection name
             try:
-                template_ref = firestore_db.collection("hvt_generator").document(doc_type)
+                template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
                 templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
 
                 if not templates:
-                    st.error("No templates found in the database for NDA")
+                    st.error("No templates found in the database for Internship Offer")
                     return
 
                 # Get the first template (order_number = 1)
@@ -561,7 +599,7 @@ def handle_nda():
 
                 # Visibility check
                 if template_data.get('visibility', 'Private') != 'Public':
-                    st.error("This NDA template is not currently available")
+                    st.error("This Offer template is not currently available")
                     return
 
                 # File type check
@@ -596,15 +634,23 @@ def handle_nda():
                 docx_output = temp_docx.name
 
                 # Use the downloaded template
-                nda_edit(template_path, docx_output, replacements_docx)
+                offer_edit(template_path, docx_output, replacements_docx)
                 main_converter(docx_output, pdf_output)
 
             # Preview section
             st.subheader("Preview")
-            st.write(f"**Agreement Date:** {st.session_state.nda_data['date']}")
-            st.write(f"**Client Name:** {st.session_state.nda_data['client_name']}")
-            st.write(f"**Client Company Name:** {st.session_state.nda_data['client_company_name']}")
-            st.write(f"**Client Address:** {st.session_state.nda_data['client_company_address']}")
+            st.write(f"**Agreement Date:** {st.session_state.internship_offer_data['date']}")
+            st.write(f"**Intern Name:** {st.session_state.internship_offer_data['intern_name']}")
+            st.write(f"**Designation:** {st.session_state.internship_offer_data['position']}")
+            st.write(f"**Start Date:** {st.session_state.internship_offer_data['date']}")
+            st.write(f"**End Date:** {st.session_state.internship_offer_data['end_date']}")
+            st.write(f"**Stipend:** {st.session_state.internship_offer_data['amount']}")
+            st.write(f"**Amount in words:** {st.session_state.internship_offer_data['amount_in_words']}")
+            st.write(f"**Duration:** {st.session_state.internship_offer_data['duration']} months")
+
+            # st.write(f"**Offer valid Date:** {st.session_state.offer_data['valid_date']}")
+            # st.write(f"**Client Company Name:** {st.session_state.nda_data['client_company_name']}")
+            # st.write(f"**Client Address:** {st.session_state.nda_data['client_company_address']}")
 
             # PDF preview (requires pdfplumber)
             pdf_view(pdf_output)
@@ -614,10 +660,15 @@ def handle_nda():
             col1, col2 = st.columns(2)
 
             file_upload_details = {
-                "client_name": st.session_state.nda_data['client_name'],
-                "company_name": st.session_state.nda_data['client_company_name'],
-                "company_address": st.session_state.nda_data['client_company_address'],
-                "agreement_date": st.session_state.nda_data['date'],
+                "date": st.session_state.internship_offer_data["date"],
+                "start_date": st.session_state.internship_offer_data["start_date"],
+                "end_date": st.session_state.internship_offer_data["end_date"],
+                "name": st.session_state.internship_offer_data["intern_name"],
+                "amount": st.session_state.internship_offer_data["amount"],
+                "amount_in_words": st.session_state.internship_offer_data["amount_in_words"],
+                "valid_date": st.session_state.internship_offer_data["valid_date"],
+                "designation": st.session_state.internship_offer_data["position"],
+                "duration": st.session_state.internship_offer_data["duration"],
                 "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "upload_timestamp": firestore.SERVER_TIMESTAMP,
             }
@@ -626,13 +677,13 @@ def handle_nda():
                 # generate_download_link(pdf_output,
                 #                        f"{st.session_state.nda_data['client_company_name']} NDA.pdf", "PDF", "NDA")
                 #
-                if st.button("✅ Confirm and Upload Contract PDF", key="upload_pdf"):
+                if st.button("✅ Confirm and Upload Internship PDF", key="upload_pdf"):
                     # storage_path, public_url = save_generated_file_to_firebase(pdf_output, doc_type="NDA",
                     #                                                            bucket=bucket)
 
                     save_generated_file_to_firebase_2(
                         pdf_output,
-                        "NDA",
+                        "Internship Offer",
                         bucket,
                         "PDF",
                         file_upload_details
@@ -641,8 +692,8 @@ def handle_nda():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(pdf_output,
-                                           f"{st.session_state.nda_data['client_company_name']} NDA.pdf",
-                                           "PDF", "NDA")
+                                           f"{st.session_state.internship_offer_data['intern_name']} {st.session_state.internship_offer_data['position']} offer.pdf",
+                                           "PDF", "Internship Offer")
 
                 # with open(pdf_output, "rb") as f_pdf:
                 #     st.download_button(
@@ -656,12 +707,12 @@ def handle_nda():
                 # generate_download_link(docx_output,
                 #                        f"{st.session_state.nda_data['client_company_name']} NDA.docx", "DOCX", "NDA")
                 #
-                if st.button("✅ Confirm and Upload Contract DOCX", key="upload_docx"):
-                    storage_path, public_url = save_generated_file_to_firebase(docx_output, doc_type="NDA",
+                if st.button("✅ Confirm and Upload Internship DOCX", key="upload_docx"):
+                    storage_path, public_url = save_generated_file_to_firebase(docx_output, doc_type="Internship Offer",
                                                                                bucket=bucket)
                     save_generated_file_to_firebase_2(
                         docx_output,
-                        "NDA",
+                        "Internship Offer",
                         bucket,
                         "DOCX",
                         file_upload_details
@@ -670,8 +721,8 @@ def handle_nda():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(docx_output,
-                                           f"{st.session_state.nda_data['client_company_name']} NDA.docx",
-                                           "DOCX", "NDA")
+                                           f"{st.session_state.internship_offer_data['intern_name']} {st.session_state.internship_offer_data['position']} offer.docx",
+                                           "DOCX", "Offer")
 
                 # with open(docx_output, "rb") as f_docx:
                 #     st.download_button(
