@@ -408,7 +408,7 @@ if selected_option == "Admin Panel":
                                         blob.delete()
                                         template_ref.collection(section_key).document(doc_id).delete()
                                         st.success("Template deleted successfully")
-                                        st.experimental_rerun()
+                                        st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
                                     except Exception as e:
                                         st.error(f"Error deleting: {e}")
 
@@ -418,7 +418,7 @@ if selected_option == "Admin Panel":
                                 if st.button(edit_button_label, key=f"edit_toggle_{doc_id}"):
                                     st.session_state[f"edit_mode_{doc_id}"] = not st.session_state[
                                         f"edit_mode_{doc_id}"]
-                                    st.experimental_rerun()
+                                    st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
                                 # Save button (only shown in edit mode)
                                 if st.session_state[f"edit_mode_{doc_id}"]:
@@ -431,7 +431,7 @@ if selected_option == "Admin Panel":
                                         })
                                         st.session_state[f"edit_mode_{doc_id}"] = False
                                         st.success("Metadata updated successfully")
-                                        st.experimental_rerun()
+                                        st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
                                 # Preview toggle button
                                 preview_button_label = "👁️ Show Preview" if not st.session_state[
@@ -480,7 +480,7 @@ if selected_option == "Admin Panel":
                                     "visibility": new_vis
                                 })
                                 st.success("Metadata updated successfully")
-                                st.experimental_rerun()
+                                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
                         with col2:
                             if st.button("🗑️ Delete Template", key=f"delete_{doc_id}"):
@@ -489,7 +489,7 @@ if selected_option == "Admin Panel":
                                     blob.delete()
                                     template_ref.collection("templates").document(doc_id).delete()
                                     st.success("Template deleted successfully")
-                                    st.experimental_rerun()
+                                    st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
                                 except Exception as e:
                                     st.error(f"Error deleting: {e}")
 
