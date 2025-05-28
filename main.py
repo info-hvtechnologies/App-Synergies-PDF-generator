@@ -187,9 +187,14 @@ if selected_option == "Admin Panel":
 
         # Template upload section
         with st.expander("➕ Upload Template", expanded=True):
+            # doc_type = st.selectbox(
+            #     "Select Document Type",
+            #     ["Internship Certificate", "NDA", "Invoice", "Contract", "Proposal"],
+            #     key="doc_type_select"
+            # )
             doc_type = st.selectbox(
                 "Select Document Type",
-                ["Internship Certificate", "NDA", "Invoice", "Contract", "Proposal"],
+                ["Internship Certificate"],
                 key="doc_type_select"
             )
 
@@ -506,14 +511,24 @@ if selected_option == "Admin Panel":
                             f"**Download:** [{template_data['original_name']}]({template_data['download_url']})")
 
 
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        # tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        #     ["Internship Certificate",
+        #      # "NDA",
+        #      # "Invoice",
+        #      # "Contract",
+        #      # "Proposal",
+        #      "Internship Positions"
+        #      ])
+        tab1, tab2 = st.tabs(
             ["Internship Certificate",
-             "NDA",
-             "Invoice",
-             "Contract",
-             "Proposal",
+             # "NDA",
+             # "Invoice",
+             # "Contract",
+             # "Proposal",
              "Internship Positions"
              ])
+
+
 
         with tab1:
             show_templates_tab("Internship Certificate")
@@ -530,7 +545,7 @@ if selected_option == "Admin Panel":
         # with tab5:
         #     show_templates_tab("Proposal")
 
-        with tab6:
+        with tab2:
             manage_internship_roles_tab()
 
 
@@ -539,12 +554,17 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
     st.title("📜 Generated Documents History")
 
     # Create tabs for each document type
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    # tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    #     "Internship",
+    #     "NDA",
+    #     "Invoice",
+    #     "Contract",
+    #     "Proposal"
+    # ])
+    tab1, tab2 = st.tabs([
         "Internship",
-        "NDA",
-        "Invoice",
-        "Contract",
-        "Proposal"
+        "Offer",
+
     ])
 
 
@@ -701,16 +721,16 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
         display_documents_by_type("Internship")
 
     with tab2:
-        display_documents_by_type("NDA")
+        display_documents_by_type("Offer")
 
-    with tab3:
-        display_documents_by_type("Invoice")
-
-    with tab4:
-        display_documents_by_type("Contract")
-
-    with tab5:
-        display_documents_by_type("Proposal")
+    # with tab3:
+    #     display_documents_by_type("Invoice")
+    #
+    # with tab4:
+    #     display_documents_by_type("Contract")
+    #
+    # with tab5:
+    #     display_documents_by_type("Proposal")
 
 # Handle document types
 elif selected_option == "Internship Certificate":
