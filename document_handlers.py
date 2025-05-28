@@ -549,7 +549,7 @@ def handle_internship_offer():
                     "start_date": f"{start_date.day}/{start_date.month}/{start_date.year}",
                     "end_date": f"{end_date.day}/{end_date.month}/{end_date.year}",
                     "valid_date": f"{valid_date.day}/{valid_date.month}/{valid_date.year}",
-                    "amount": format_currency_amount(stipend),
+                    "amount": f"₹ {format_currency_amount(stipend)}",
                     "amount_in_words": currency_to_words_in_inr(format_currency_amount(stipend)),
 
                     # "client_company_name": client_company_name,
