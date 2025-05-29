@@ -1,8 +1,9 @@
 import json
 import os
 import streamlit as st
+from load_config import LOAD_LOCALLY
 
-LOAD_LOCALLY = False
+# LOAD_LOCALLY = False
 
 JSON_PATH = "roles.json"
 

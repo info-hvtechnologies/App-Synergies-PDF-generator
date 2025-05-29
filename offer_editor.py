@@ -2,15 +2,7 @@ from docxtpl import DocxTemplate
 
 
 def offer_edit(input_path, output_path, context):
-    # vowel_list = ["a", "e", "i", "o", "u"]
-    # first_letter = context["intern_name"].strip()[0].lower()
-    # if first_letter in vowel_list:
-    #     a_ = {"a": "an"}
-    #     context.update(a_)
-    # else:
-    #     a_ = {"a": "a"}
-    #     context.update(a_)
-    # Load the template
+
     doc = DocxTemplate(input_path)
     # Render the template
     doc.render(context)

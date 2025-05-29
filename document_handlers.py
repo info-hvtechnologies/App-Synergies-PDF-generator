@@ -21,8 +21,9 @@ from invoice_editor import invoice_edit
 from testimonial_page_edit import EditTextFile
 from offer_editor import offer_edit
 import re
+from load_config import LOAD_LOCALLY
 
-LOAD_LOCALLY = False
+# LOAD_LOCALLY = False
 
 
 def format_currency_amount(raw_price: str) -> str:
@@ -66,33 +67,33 @@ def format_currency_amount(raw_price: str) -> str:
 #         '''
 #         st.markdown(href, unsafe_allow_html=True)
 
-
-def save_generated_file_to_firebase(local_file_path, doc_type, bucket):
-    try:
-        from datetime import datetime
-        import os
-
-        # Get filename from local path
-        filename = os.path.basename(local_file_path)
-
-        # Define storage path
-        storage_path = f"hvt_generator/generated/{doc_type}/{filename}"
-
-        # Upload to Firebase Storage
-        blob = bucket.blob(storage_path)
-        blob.upload_from_filename(local_file_path)
-
-        # Make it public or generate signed URL
-        public_url = blob.public_url
-
-        st.success(f"✅ File uploaded to Firebase")
-        # st.markdown(f"[📁 View File]({public_url})")
-
-        return storage_path, public_url
-
-    except Exception as e:
-        st.error(f"❌ Failed to upload file: {e}")
-        return None, None
+#
+# def save_generated_file_to_firebase(local_file_path, doc_type, bucket):
+#     try:
+#         from datetime import datetime
+#         import os
+#
+#         # Get filename from local path
+#         filename = os.path.basename(local_file_path)
+#
+#         # Define storage path
+#         storage_path = f"hvt_generator/generated/{doc_type}/{filename}"
+#
+#         # Upload to Firebase Storage
+#         blob = bucket.blob(storage_path)
+#         blob.upload_from_filename(local_file_path)
+#
+#         # Make it public or generate signed URL
+#         public_url = blob.public_url
+#
+#         st.success(f"✅ File uploaded to Firebase")
+#         # st.markdown(f"[📁 View File]({public_url})")
+#
+#         return storage_path, public_url
+#
+#     except Exception as e:
+#         st.error(f"❌ Failed to upload file: {e}")
+#         return None, None
 
 
 # from datetime import datetime
@@ -317,26 +318,6 @@ def handle_internship_certificate():
                 # "first_paycheque_date": st.session_state.offer_data["first_paycheck"].strftime("%B %d, %Y"),
             }
 
-
-            # context = {
-            #     "date": st.session_state.offer_data["start_date"].strftime("%B %d, %Y"),
-            #     "name": st.session_state.offer_data["name"],
-            #     "position": st.session_state.offer_data["position"],
-            #     "stipend": str(st.session_state.offer_data["stipend"]),
-            #     "hours": str(st.session_state.offer_data["hours"]),
-            #     "internship_duration": str(st.session_state.offer_data["duration"]),
-            #     "first_paycheque_date": st.session_state.offer_data["first_paycheck"].strftime("%B %d, %Y"),
-            # }
-
-
-
-
-
-
-            #______________________________________________________________________________________
-
-
-
             template_path = None
             docx_output = None
             pdf_output = None
@@ -396,8 +377,6 @@ def handle_internship_certificate():
                 template_path = os.path.join(temp_dir, "template.docx")
                 blob.download_to_filename(template_path)
 
-                # ______________________________________________________________________________________
-
                 docx_output = os.path.join(temp_dir, "cert.docx")
                 pdf_output = os.path.join(temp_dir, "cert.pdf")
 
@@ -441,8 +420,6 @@ def handle_internship_certificate():
                     if os.path.exists(pdf_output):
 
                         if st.button("✅ Confirm and Upload Internship Certificate PDF", key="upload_pdf"):
-                            # storage_path, public_url = save_generated_file_to_firebase(pdf_output, doc_type="Internship",
-                            #                                                            bucket=bucket)
 
                             save_generated_file_to_firebase_2(
                                 pdf_output,
@@ -458,18 +435,13 @@ def handle_internship_certificate():
                                                    f"{file_prefix} Internship Certificate.pdf",
                                                    "PDF", "Internship")
 
-
                     else:
                         st.warning("PDF file not available")
 
                 with col2:
                     if os.path.exists(docx_output):
-                        # generate_download_link(docx_output,
-                        #                        f"{file_prefix} Offer Letter.docx", "DOCX", "Internship")
 
                         if st.button("✅ Confirm and Upload Internship Certificate DOCX", key="upload_docx"):
-                            # storage_path, public_url = save_generated_file_to_firebase(docx_output, doc_type="Internship",
-                            #                                                            bucket=bucket)
 
                             save_generated_file_to_firebase_2(
                                 docx_output,
@@ -484,13 +456,6 @@ def handle_internship_certificate():
                                                    f"{file_prefix} Internship Certificate.docx",
                                                    "DOCX", "Internship")
 
-                        # with open(docx_output, "rb") as f_docx:
-                        #     st.download_button(
-                        #         "⬇️ Download DOCX",
-                        #         f_docx,
-                        #         file_name=f"{file_prefix} Offer Letter.docx",
-                        #         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        #     )
                     else:
                         st.warning("DOCX file not available")
 
@@ -537,9 +502,6 @@ def handle_internship_offer():
             valid_date = st.date_input("Offer Valid Date", value=datetime.now().date())
             stipend = st.text_input("Stipend (Figures only)")
 
-            # client_company_name = st.text_input("Client Company Name")
-            # client_company_address = st.text_area("Client Company Address")
-
             if st.form_submit_button("Generate Offer"):
                 st.session_state.internship_offer_data = {
                     "date": f"{date.day}/{date.month}/{date.year}",
@@ -551,9 +513,6 @@ def handle_internship_offer():
                     "valid_date": f"{valid_date.day}/{valid_date.month}/{valid_date.year}",
                     "amount": f"₹ {format_currency_amount(stipend)}",
                     "amount_in_words": currency_to_words_in_inr(format_currency_amount(stipend)),
-
-                    # "client_company_name": client_company_name,
-                    # "client_company_address": client_company_address
                 }
                 st.session_state.internship_offer_form_step = 2
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
@@ -563,9 +522,8 @@ def handle_internship_offer():
         # st.success("NDA generated successfully!")
         with st.spinner("Loading template and generating offer..."):
             st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'internship_offer_form_step', 1))
-            # 9
 
-            # Generate documents
+           # Generate documents
             replacements_docx = {
                 "date": st.session_state.internship_offer_data["date"],
                 "start_date": st.session_state.internship_offer_data["start_date"],
@@ -576,10 +534,7 @@ def handle_internship_offer():
                 "valid_date": st.session_state.internship_offer_data["valid_date"],
                 "designation": st.session_state.internship_offer_data["position"],
                 "m": st.session_state.internship_offer_data["duration"],
-                # "client_name": f" {st.session_state.nda_data['client_name']}",
-                # "client_name": new_text,
-                # "client_company_name": st.session_state.nda_data["client_company_name"],
-                # "client_company_address": st.session_state.nda_data["client_company_address"]
+
             }
 
             # Get template from Firestore
@@ -648,10 +603,6 @@ def handle_internship_offer():
             st.write(f"**Amount in words:** {st.session_state.internship_offer_data['amount_in_words']}")
             st.write(f"**Duration:** {st.session_state.internship_offer_data['duration']} months")
 
-            # st.write(f"**Offer valid Date:** {st.session_state.offer_data['valid_date']}")
-            # st.write(f"**Client Company Name:** {st.session_state.nda_data['client_company_name']}")
-            # st.write(f"**Client Address:** {st.session_state.nda_data['client_company_address']}")
-
             # PDF preview (requires pdfplumber)
             pdf_view(pdf_output)
 
@@ -674,12 +625,8 @@ def handle_internship_offer():
             }
 
             with col1:
-                # generate_download_link(pdf_output,
-                #                        f"{st.session_state.nda_data['client_company_name']} NDA.pdf", "PDF", "NDA")
-                #
+
                 if st.button("✅ Confirm and Upload Internship PDF", key="upload_pdf"):
-                    # storage_path, public_url = save_generated_file_to_firebase(pdf_output, doc_type="NDA",
-                    #                                                            bucket=bucket)
 
                     save_generated_file_to_firebase_2(
                         pdf_output,
@@ -695,21 +642,11 @@ def handle_internship_offer():
                                            f"{st.session_state.internship_offer_data['intern_name']} {st.session_state.internship_offer_data['position']} offer.pdf",
                                            "PDF", "Internship Offer")
 
-                # with open(pdf_output, "rb") as f_pdf:
-                #     st.download_button(
-                #         "⬇️ Download PDF",
-                #         f_pdf,
-                #         file_name=f"{st.session_state.nda_data['client_company_name']} NDA.pdf",
-                #         mime="application/pdf"
-                #     )
 
             with col2:
-                # generate_download_link(docx_output,
-                #                        f"{st.session_state.nda_data['client_company_name']} NDA.docx", "DOCX", "NDA")
-                #
+
                 if st.button("✅ Confirm and Upload Internship DOCX", key="upload_docx"):
-                    storage_path, public_url = save_generated_file_to_firebase(docx_output, doc_type="Internship Offer",
-                                                                               bucket=bucket)
+
                     save_generated_file_to_firebase_2(
                         docx_output,
                         "Internship Offer",
@@ -724,13 +661,192 @@ def handle_internship_offer():
                                            f"{st.session_state.internship_offer_data['intern_name']} {st.session_state.internship_offer_data['position']} offer.docx",
                                            "DOCX", "Offer")
 
-                # with open(docx_output, "rb") as f_docx:
-                #     st.download_button(
-                #         "⬇️ Download DOCX",
-                #         f_docx,
-                #         file_name=f"{st.session_state.nda_data['client_company_name']} NDA.docx",
-                #         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                #     )
+        # Clean up temp files
+        try:
+            import os
+            os.unlink(template_path)
+            os.unlink(pdf_output)
+            os.unlink(docx_output)
+        except:
+            pass
+
+
+def handle_relieving_letter():
+    st.title("📄 Relieving Letter Form")
+
+    # Initialize session state for multi-page form
+    if 'relieving_letter_form_step' not in st.session_state:
+        st.session_state.relieving_letter_form_step = 1
+        st.session_state.relieving_letter_data = {}
+
+    if st.session_state.relieving_letter_form_step == 1:
+        # Step 1: Collect information
+        with st.form("relieving_letter_form"):
+            date = datetime.now().date()
+
+            intern_name = st.text_input("Name")
+            json_path = "roles.json"
+            try:
+                with open(json_path, "r") as f:
+                    data = json.load(f)
+                    data_ = data.get("internship_position", [])
+            except Exception as e:
+                st.error(f"Error loading roles from JSON: {str(e)}")
+            positions = data_
+            position = st.selectbox("Internship Designation", positions, index=0 if positions else None)
+
+            duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=3)
+            start_date = st.date_input("Start Date", value=datetime.now().date())
+            end_date = st.date_input("End Date", value=datetime.now().date())
+            # valid_date = st.date_input("Offer Valid Date", value=datetime.now().date())
+            # stipend = st.text_input("Stipend (Figures only)")
+
+            if st.form_submit_button("Generate Letter"):
+                st.session_state.relieving_letter_data = {
+                    "date": f"{date.day}-{date.month}-{date.year}",
+                    "intern_name": intern_name,
+                    "position": position,
+                    "duration": duration,
+                    "start_date": f"{start_date.day}-{start_date.month}-{start_date.year}",
+                    "end_date": f"{end_date.day}-{end_date.month}-{end_date.year}",
+
+                }
+                st.session_state.relieving_letter_form_step = 2
+                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    elif st.session_state.relieving_letter_form_step == 2:
+        # Step 2: Preview and download
+        with st.spinner("Loading template and generating letter..."):
+            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'relieving_letter_form_step', 1))
+
+            # Generate documents
+            replacements_docx = {
+                "today_date": st.session_state.relieving_letter_data["date"],
+                "start_date": st.session_state.relieving_letter_data["start_date"],
+                "end_date": st.session_state.relieving_letter_data["end_date"],
+                "intern_name": st.session_state.relieving_letter_data["intern_name"],
+                "designation": st.session_state.relieving_letter_data["position"],
+                "m": st.session_state.relieving_letter_data["duration"],
+
+            }
+
+            # Get template from Firestore
+            doc_type = "Relieving Letter"  # Changed to match your collection name
+            try:
+                template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+                templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
+
+                if not templates:
+                    st.error("No templates found in the database for Internship Offer")
+                    return
+
+                # Get the first template (order_number = 1)
+
+                template_doc = templates[0]
+                template_data = template_doc.to_dict()
+
+                # Visibility check
+                if template_data.get('visibility', 'Private') != 'Public':
+                    st.error("This Relieving Letter template is not currently available")
+                    return
+
+                # File type check
+                if template_data.get(
+                        'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                    st.error("Template is not a valid Word document (.docx)")
+                    return
+
+                # Check if storage_path exists
+                if 'storage_path' not in template_data:
+                    st.error("Template storage path not found in the database")
+                    return
+
+                # Download the template file from Firebase Storage
+                # bucket = storage.bucket()
+                blob = bucket.blob(template_data['storage_path'])
+
+                # Create a temporary file for the template
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
+                    blob.download_to_filename(temp_template.name)
+                    template_path = temp_template.name
+
+            except Exception as e:
+                st.error(f"Error fetching template: {str(e)}")
+                return
+
+            # Generate temporary files
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf, \
+                    tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_docx:
+
+                pdf_output = temp_pdf.name
+                docx_output = temp_docx.name
+                from releive_editor import relieve_edit
+
+                # Use the downloaded template
+                relieve_edit(template_path, docx_output, replacements_docx)
+                main_converter(docx_output, pdf_output)
+
+            # Preview section
+            st.subheader("Preview")
+            st.write(f"**Date:** {st.session_state.relieving_letter_data['date']}")
+            st.write(f"**Intern Name:** {st.session_state.relieving_letter_data['intern_name']}")
+            st.write(f"**Designation:** {st.session_state.relieving_letter_data['position']}")
+            st.write(f"**Start Date:** {st.session_state.relieving_letter_data['date']}")
+            st.write(f"**End Date:** {st.session_state.relieving_letter_data['end_date']}")
+            st.write(f"**Duration:** {st.session_state.relieving_letter_data['duration']} months")
+
+            # PDF preview (requires pdfplumber)
+            pdf_view(pdf_output)
+
+            # Download buttons
+            st.subheader("Download Documents")
+            col1, col2 = st.columns(2)
+
+            file_upload_details = {
+                "date": st.session_state.relieving_letter_data["date"],
+                "start_date": st.session_state.relieving_letter_data["start_date"],
+                "end_date": st.session_state.relieving_letter_data["end_date"],
+                "name": st.session_state.relieving_letter_data["intern_name"],
+                "designation": st.session_state.relieving_letter_data["position"],
+                "duration": st.session_state.relieving_letter_data["duration"],
+                "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "upload_timestamp": firestore.SERVER_TIMESTAMP,
+            }
+
+            with col1:
+
+                if st.button("✅ Confirm and Upload Letter PDF", key="upload_pdf"):
+                    save_generated_file_to_firebase_2(
+                        pdf_output,
+                        "Relieving Letter",
+                        bucket,
+                        "PDF",
+                        file_upload_details
+                    )
+
+                    st.success("Now you can download the file:")
+                    # Step 2: Show download link only after upload
+                    generate_download_link(pdf_output,
+                                           f"{st.session_state.relieving_letter_data['intern_name']} {st.session_state.relieving_letter_data['position']} letter.pdf",
+                                           "PDF", "Relieving Letter")
+
+            with col2:
+
+                if st.button("✅ Confirm and Upload Letter DOCX", key="upload_docx"):
+
+                    save_generated_file_to_firebase_2(
+                        docx_output,
+                        "Relieving Letter",
+                        bucket,
+                        "DOCX",
+                        file_upload_details
+                    )
+
+                    st.success("Now you can download the file:")
+                    # Step 2: Show download link only after upload
+                    generate_download_link(docx_output,
+                                           f"{st.session_state.relieving_letter_data['intern_name']} {st.session_state.relieving_letter_data['position']} letter.docx",
+                                           "DOCX", "Relieving Letter")
 
         # Clean up temp files
         try:

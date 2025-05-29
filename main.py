@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 import streamlit as st
 from dotenv import load_dotenv
 from firebase_conf import auth, rt_db, bucket, firestore_db
-from document_handlers import handle_internship_certificate, handle_internship_offer, handle_invoice, handle_contract, handle_proposal
+from document_handlers import (handle_internship_certificate, handle_internship_offer, handle_relieving_letter, handle_invoice,
+                               handle_contract, handle_proposal)
 from google.cloud import firestore
 from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 import tempfile
@@ -12,71 +13,106 @@ import pdfplumber
 from apscheduler.schedulers.background import BackgroundScheduler
 from manage_internship_roles_tab import manage_internship_roles_tab
 from docx_pdf_converter import main_converter
+from load_config import LOAD_LOCALLY
 
 load_dotenv()
 
-LOAD_LOCALLY = False
+# LOAD_LOCALLY = False
+from streamlit.components.v1 import html
+def streamlit_style_password_input(label="Password", key="password_input"):
+    show_password = st.checkbox("Show password", key=f"{key}_show")
 
-# import os
-# import json
-# from google.cloud import storage
-# from firebase_admin import firestore
-# from pathlib import Path
-#
-#
-# def download_all_generated_files(temp_dir, firestore_db, bucket):
-#     try:
-#         docs = firestore_db.collection("generated_files").stream()
-#         for doc in docs:
-#             data = doc.to_dict()
-#
-#             filename = data.get("name")
-#             storage_path = data.get("storage_path")
-#             doc_type = data.get("doc_type", "Unknown")
-#             template_part = data.get("template_part")
-#             proposal_section_type = data.get("proposal_section_type")
-#
-#             # Construct local subfolder path
-#             subfolder_parts = [doc_type]
-#             if proposal_section_type:
-#                 subfolder_parts.append(proposal_section_type)
-#             elif template_part:
-#                 subfolder_parts.append(template_part)
-#
-#             local_subdir = os.path.join(temp_dir, *subfolder_parts)
-#             Path(local_subdir).mkdir(parents=True, exist_ok=True)
-#
-#             # Define full local file path
-#             local_file_path = os.path.join(local_subdir, filename)
-#             metadata_file_path = os.path.join(local_subdir, f"{filename}.json")
-#
-#             # Download file from Firebase Storage
-#             blob = bucket.blob(storage_path)
-#             blob.download_to_filename(local_file_path)
-#
-#             # Save metadata to JSON file
-#             with open(metadata_file_path, "w") as f:
-#                 json.dump(data, f, indent=2)
-#
-#         print(f"✅ All files downloaded to: {temp_dir}")
-#
-#     except Exception as e:
-#         print(f"❌ Failed to download files: {e}")
-#
-#
-# def pdf_view(file_input):
-#     try:
-#
-#         with pdfplumber.open(file_input) as pdf:
-#             st.subheader("Preview")
-#             for i, page in enumerate(pdf.pages):
-#                 st.image(
-#                     page.to_image(resolution=150).original,
-#                     caption=f"Page {i + 1}",
-#                     use_column_width=True
-#                 )
-#     except Exception as e:
-#         st.warning(f"Couldn't generate PDF preview: {str(e)}")
+    if show_password:
+        return st.text_input(label, type="default", key=key)
+    else:
+        return st.text_input(label, type="password", key=key)
+
+def twitter_like_password_field(label="Password"):
+    container_id = f"pw_container_{hash(label)}"
+    input_id = f"pw_input_{hash(label)}"
+    button_id = f"pw_button_{hash(label)}"
+
+    # Streamlit dark mode colors
+    primary_color = "#F63366"     # Streamlit pink
+    bg_color = "#0e1117"          # Input field background
+    text_color = "#FFFFFF"        # Input text color
+    border_color = "#333"         # Subtle border
+    focus_color = bg_color   # Border/focus
+
+    css = f"""
+        <style>
+            #{container_id} {{
+                position: relative;
+                margin-bottom: 1rem;
+                margin-left: -0.5rem;  /* 👈 Moves the entire field to the left */
+            }}
+            #{input_id} {{
+                width: 100%;
+                height: 2rem; /* <-- Explicit height (adjust as needed) */
+                padding: 0.5rem;
+                padding-right: 2.5rem;
+                border: 1px  {border_color};
+                border-radius: 0.375rem 0.375rem 0.375rem 0.375rem;
+
+                font-size: 1rem;
+                font-family: inherit;
+                background-color: {bg_color};
+                color: {text_color};
+            }}
+            #{button_id} {{
+                position: absolute;
+                right: 0.5rem;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                color: {primary_color};
+                cursor: pointer;
+                font-size: 0.875rem;
+                font-weight: 600;
+            }}
+            #{input_id}:focus {{
+                outline: none;
+                border-color: {focus_color};
+                box-shadow: 0 0 0 1px {focus_color};
+            }}
+        </style>
+        """
+
+    js = f"""
+    <script>
+        function togglePasswordVisibility() {{
+            const input = document.getElementById("{input_id}");
+            const button = document.getElementById("{button_id}");
+
+            if (input.type === "password") {{
+                input.type = "text";
+                button.textContent = "Hide";
+            }} else {{
+                input.type = "password";
+                button.textContent = "Show";
+            }}
+        }}
+    </script>
+    """
+
+    html_code = f"""
+    {css}
+    {js}
+    <div id="{container_id}">
+        <input type="password" id="{input_id}" placeholder="{label}" />
+        <button id="{button_id}" type="button" onclick="togglePasswordVisibility()">Show</button>
+    </div>
+    """
+
+    html(html_code, height=60)
+
+    # You can optionally add value tracking here
+    if f'pw_{input_id}' not in st.session_state:
+        st.session_state[f'pw_{input_id}'] = ""
+
+    return st.session_state[f'pw_{input_id}']
+
 
 def cleanup_broken_metadata():
     """Check for and remove Firestore documents that reference non-existent storage blobs"""
@@ -142,7 +178,7 @@ def admin_login(email, password):
 DOCUMENT_TYPES = [
     "Internship Certificate",
     "Internship Offer",
-    # "Invoice",
+    "Relieving Letter",
     # "Contract",
     # "Proposal",
     "Admin Panel"
@@ -172,6 +208,9 @@ if selected_option == "Admin Panel":
         with st.form("admin_login_form"):
             admin_user = st.text_input("Admin Email")
             admin_pass = st.text_input("Password", type="password")
+            # # twitter_like_password_field("Password")
+            # password = streamlit_style_password_input("Enter your password")
+
             login = st.form_submit_button("Login")
 
             if login:
@@ -194,7 +233,7 @@ if selected_option == "Admin Panel":
             # )
             doc_type = st.selectbox(
                 "Select Document Type",
-                ["Internship Certificate", "Internship Offer"],
+                ["Internship Certificate", "Internship Offer", "Relieving Letter"],
                 key="doc_type_select"
             )
 
@@ -519,10 +558,10 @@ if selected_option == "Admin Panel":
         #      # "Proposal",
         #      "Internship Positions"
         #      ])
-        tab1, tab2, tab3 = st.tabs(
+        tab1, tab2, tab3, tab4 = st.tabs(
             ["Internship Certificate",
              "Internship Offer",
-             # "Invoice",
+             "Relieving Letter",
              # "Contract",
              # "Proposal",
              "Internship Positions"
@@ -535,17 +574,17 @@ if selected_option == "Admin Panel":
 
         with tab2:
             show_templates_tab("Internship Offer")
-        #
-        # with tab3:
-        #     show_templates_tab("Invoice")
-        #
+
+        with tab3:
+            show_templates_tab("Relieving Letter")
+
         # with tab4:
         #     show_templates_tab("Contract")
         #
         # with tab5:
         #     show_templates_tab("Proposal")
 
-        with tab3:
+        with tab4:
             manage_internship_roles_tab()
 
 
@@ -561,9 +600,10 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
     #     "Contract",
     #     "Proposal"
     # ])
-    tab1, tab2 = st.tabs([
+    tab1, tab2, tab3 = st.tabs([
         "Internship",
         "Internship Offer",
+        "Relieving Letter"
 
     ])
 
@@ -723,9 +763,9 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
     with tab2:
         display_documents_by_type("Internship Offer")
 
-    # with tab3:
-    #     display_documents_by_type("Invoice")
-    #
+    with tab3:
+        display_documents_by_type("Relieving Letter")
+
     # with tab4:
     #     display_documents_by_type("Contract")
     #
@@ -738,10 +778,10 @@ elif selected_option == "Internship Certificate":
 
 elif selected_option == "Internship Offer":
     handle_internship_offer()
-#
-# elif selected_option == "Invoice":
-#     handle_invoice()
-#
+
+elif selected_option == "Relieving Letter":
+    handle_relieving_letter()
+
 # elif selected_option == "Contract":
 #     handle_contract()
 #
