@@ -98,8 +98,11 @@ if st.session_state.get('is_admin', False):
 
 # st.sidebar.title("📑 Navigation")
 st.sidebar.title("📑 Menu")
+if 'pending_redirect' in st.session_state:
+    st.session_state['selected_option'] = st.session_state.pop('pending_redirect')
 
-selected_option = st.sidebar.radio("Choose a document type or Admin Panel", DOCUMENT_TYPES)
+# selected_option = st.sidebar.radio("Choose a document type or Admin Panel", DOCUMENT_TYPES)
+selected_option = st.sidebar.radio("Choose a document type or Admin Panel", DOCUMENT_TYPES, key="selected_option")
 
 # Show logout button if logged in
 if st.session_state.user:
@@ -636,15 +639,37 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
                     with col2:
                         # Download button using previously downloaded file
                         if temp_file_bytes:
-                            st.download_button(
-                                label="⬇️ Download",
-                                data=temp_file_bytes,
-                                file_name=data.get('name', 'document'),
-                                mime=data.get('file_type', 'application/pdf'),
-                                key=f"download_{doc_id}"
-                            )
+                            # st.download_button(
+                            #     label="⬇️ Download",
+                            #     data=temp_file_bytes,
+                            #     file_name=data.get('name', 'document'),
+                            #     mime=data.get('file_type', 'application/pdf'),
+                            #     key=f"download_{doc_id}"
+                            # )
+                            if st.button("🔄 Regenerate",
+                                         key=f"regenerate_{data.get('name', data.get('client_name', data.get('intern', 'Unnamed Document')))}"):
+                                st.session_state['regenerate_data'] = {
+                                    'doc_type': doc_type,
+                                    'metadata': data,
+                                    'source': 'history'
+                                }
+
+                                doc_type_map = {
+                                    "Internship": "Internship Certificate",
+                                    "Offer": "Internship Offer",
+                                    "Relieving Letter": "Relieving Letter",
+                                    "NDA": "NDA",
+                                    "Contract": "Contract",
+                                    "Proposal": "Proposal"
+                                }
+                                print("here-----------")
+                                print(data.get('doc_type'))
+                                # Set the matching sidebar label
+                                st.session_state['pending_redirect'] = doc_type_map.get(doc_type, "Admin Panel")
+                                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
                         else:
-                            st.caption("Preview to enable download.")
+                            st.caption(f"Preview to Regenerate {doc_type}.")
 
                         # Delete button
                         if st.button("🗑️ Delete", key=f"delete_{doc_id}"):

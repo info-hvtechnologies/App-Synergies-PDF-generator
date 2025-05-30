@@ -258,6 +258,9 @@ def fetch_and_organize_templates(firestore_db, base_temp_dir=None):
 
 def handle_internship_certificate():
     st.title("📄 Internship Certificate Form")
+    regenerate_data = st.session_state.get('regenerate_data', {})
+    is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Internship"
+    metadata = regenerate_data.get('metadata', {})
 
     # Initialize session state for multi-page form
     if 'form_step' not in st.session_state:
@@ -267,7 +270,17 @@ def handle_internship_certificate():
     # Step 1: Collect information
     if st.session_state.form_step == 1:
         with st.form("internship_offer_form"):
-            name = st.text_input("Intern Name", placeholder="John Doe")
+            name = st.text_input("Intern Name", value=metadata.get('intern', ''), placeholder="John Doe")
+            # json_path = "roles.json"
+            # try:
+            #     with open(json_path, "r") as f:
+            #         data = json.load(f)
+            #         data_ = data.get("internship_position", [])
+            # except Exception as e:
+            #     st.error(f"Error loading roles from JSON: {str(e)}")
+            # positions = data_
+            # position = st.selectbox("Internship Position", positions, index=0 if positions else None,)
+            default_position = metadata.get("position", "")
             json_path = "roles.json"
             try:
                 with open(json_path, "r") as f:
@@ -275,12 +288,24 @@ def handle_internship_certificate():
                     data_ = data.get("internship_position", [])
             except Exception as e:
                 st.error(f"Error loading roles from JSON: {str(e)}")
-            positions = data_
-            position = st.selectbox("Internship Position", positions, index=0 if positions else None)
+                data_ = []
 
-            start_date = st.date_input("Start Date", value=datetime.now().date())
-            duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=3)
-            end_date = st.date_input("End Date")
+            # Find default index for selectbox
+            try:
+                default_index = data_.index(default_position) if default_position in data_ else 0
+            except:
+                default_index = 0
+
+            position = st.selectbox("Internship Position", data_, index=default_index if data_ else 0)
+
+            default_start_date = default_start_date = datetime.strptime(metadata.get("start_date", datetime.now().strftime('%d/%m/%Y')), '%d/%m/%Y').date()
+            start_date = st.date_input("Start Date", value=default_start_date)
+            duration_str = metadata.get("duration", "3")
+            match = re.search(r"\d+", duration_str)
+            default_duration = int(match.group()) if match else 3
+            duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=default_duration)
+            default_end_date = datetime.strptime(metadata.get("end_date", datetime.now().strftime('%d/%m/%Y')), '%d/%m/%Y').date()
+            end_date = st.date_input("End Date", value=default_end_date)
 
             if st.form_submit_button("Generate Certificate"):
                 if not name.strip():
@@ -474,6 +499,27 @@ def handle_internship_certificate():
 
 def handle_internship_offer():
     st.title("📄 Internship Offer Form")
+    regenerate_data = st.session_state.get('regenerate_data', {})
+    is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Internship Offer"
+    metadata = regenerate_data.get('metadata', {})
+
+    default_date = default_start_date = datetime.strptime(
+        metadata.get("date", datetime.now().strftime('%d/%m/%Y')), '%d/%m/%Y').date()
+    default_name = metadata.get("name", "")
+    default_position = metadata.get("designation", "")
+    default_start_date = datetime.strptime(metadata.get("start_date", datetime.now().strftime('%d/%m/%Y')),
+                                           '%d/%m/%Y').date()
+    default_end_date = datetime.strptime(metadata.get("end_date", datetime.now().strftime('%d/%m/%Y')),
+                                         '%d/%m/%Y').date()
+    default_valid_date =datetime.strptime(metadata.get('valid_date', datetime.now().strftime('%d/%m/%Y')),
+                                          '%d/%m/%Y').date()
+    duration_str = metadata.get("duration", "")
+    match = re.search(r"\d+", duration_str)
+    default_duration = int(match.group()) if match else 3
+
+    stipend_str = metadata.get("amount", "")
+    match = re.search(r"\d+", stipend_str)
+    default_stipend = int(match.group()) if match else 0
 
     # Initialize session state for multi-page form
     if 'internship_offer_form_step' not in st.session_state:
@@ -483,9 +529,9 @@ def handle_internship_offer():
     if st.session_state.internship_offer_form_step == 1:
         # Step 1: Collect information
         with st.form("internship_offer_form"):
-            date = st.date_input("Offer Date")
+            date = st.date_input("Offer Date", value=metadata.get('date', default_date))
 
-            intern_name = st.text_input("Name")
+            intern_name = st.text_input("Name", value=default_name, placeholder="Zain Lo")
             json_path = "roles.json"
             try:
                 with open(json_path, "r") as f:
@@ -493,14 +539,31 @@ def handle_internship_offer():
                     data_ = data.get("internship_position", [])
             except Exception as e:
                 st.error(f"Error loading roles from JSON: {str(e)}")
-            positions = data_
-            position = st.selectbox("Internship Designation", positions, index=0 if positions else None)
+                data_ = []
 
-            duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=3)
-            start_date = st.date_input("Start Date", value=datetime.now().date())
-            end_date = st.date_input("End Date", value=datetime.now().date())
-            valid_date = st.date_input("Offer Valid Date", value=datetime.now().date())
-            stipend = st.text_input("Stipend (Figures only)")
+            # Find default index for selectbox
+            try:
+                default_index = data_.index(default_position) if default_position in data_ else 0
+            except:
+                default_index = 0
+
+            position = st.selectbox("Internship Position", data_, index=default_index if data_ else 0)
+
+            # json_path = "roles.json"
+            # try:
+            #     with open(json_path, "r") as f:
+            #         data = json.load(f)
+            #         data_ = data.get("internship_position", [])
+            # except Exception as e:
+            #     st.error(f"Error loading roles from JSON: {str(e)}")
+            # positions = data_
+            # position = st.selectbox("Internship Designation", positions, index=0 if positions else None)
+
+            duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=default_duration)
+            start_date = st.date_input("Start Date", value=default_start_date)
+            end_date = st.date_input("End Date", value=default_end_date)
+            valid_date = st.date_input("Offer Valid Date", value=default_valid_date)
+            stipend = st.text_input("Stipend (Figures only)", value=default_stipend)
 
             if st.form_submit_button("Generate Offer"):
                 st.session_state.internship_offer_data = {
@@ -673,6 +736,23 @@ def handle_internship_offer():
 
 def handle_relieving_letter():
     st.title("📄 Relieving Letter Form")
+    regenerate_data = st.session_state.get('regenerate_data', {})
+    is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Relieving Letter"
+    metadata = regenerate_data.get('metadata', {})
+
+    default_date = datetime.strptime(
+        metadata.get("date", datetime.now().strftime('%d-%m-%Y')), '%d-%m-%Y'
+    ).date()
+    default_name = metadata.get("name", "")
+    default_position = metadata.get("designation", "")
+    default_start_date = datetime.strptime(metadata.get("start_date", datetime.now().strftime('%d-%m-%Y')),
+                                           '%d-%m-%Y').date()
+    default_end_date = datetime.strptime(metadata.get("end_date", datetime.now().strftime('%d-%m-%Y')),
+                                         '%d-%m-%Y').date()
+    default_valid_date = datetime.strptime(metadata.get('valid_date', datetime.now().strftime('%d-%m-%Y')),
+                                           '%d-%m-%Y').date()
+
+    default_duration = metadata.get("duration", "3")
 
     # Initialize session state for multi-page form
     if 'relieving_letter_form_step' not in st.session_state:
@@ -684,7 +764,7 @@ def handle_relieving_letter():
         with st.form("relieving_letter_form"):
             date = datetime.now().date()
 
-            intern_name = st.text_input("Name")
+            intern_name = st.text_input("Name", value=default_name)
             json_path = "roles.json"
             try:
                 with open(json_path, "r") as f:
@@ -692,14 +772,20 @@ def handle_relieving_letter():
                     data_ = data.get("internship_position", [])
             except Exception as e:
                 st.error(f"Error loading roles from JSON: {str(e)}")
-            positions = data_
-            position = st.selectbox("Internship Designation", positions, index=0 if positions else None)
+                data_ = []
 
-            duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=3)
-            start_date = st.date_input("Start Date", value=datetime.now().date())
-            end_date = st.date_input("End Date", value=datetime.now().date())
-            # valid_date = st.date_input("Offer Valid Date", value=datetime.now().date())
-            # stipend = st.text_input("Stipend (Figures only)")
+            # Find default index for selectbox
+            try:
+                default_index = data_.index(default_position) if default_position in data_ else 0
+            except:
+                default_index = 0
+
+            position = st.selectbox("Internship Position", data_, index=default_index if data_ else 0)
+
+            duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=default_duration)
+            start_date = st.date_input("Start Date", value=default_start_date)
+            end_date = st.date_input("End Date", value=default_end_date)
+
 
             if st.form_submit_button("Generate Letter"):
                 st.session_state.relieving_letter_data = {
@@ -860,6 +946,28 @@ def handle_relieving_letter():
 
 def handle_contract():
     st.title("📄 Contract Form")
+    regenerate_data = st.session_state.get('regenerate_data', {})
+    is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Contract"
+    metadata = regenerate_data.get('metadata', {})
+
+    default_date = datetime.strptime(
+        metadata.get("date", datetime.now().strftime('%d/%m/%Y')), '%d/%m/%Y').date()
+    default_name = metadata.get("client_name", "")
+    default_client_company_name = metadata.get("client_company_name", "")
+    # default_start_date = datetime.strptime(metadata.get("start_date", datetime.now().strftime('%d/%m/%Y')),
+    #                                        '%d/%m/%Y').date()
+    default_contract_end = datetime.strptime(metadata.get("contract_end", datetime.now().strftime('%d/%m/%Y')),
+                                         '%d/%m/%Y').date()
+    default_client_address = metadata.get("client_address", "")
+    # duration_str = metadata.get("duration", "")
+    # match = re.search(r"\d+", duration_str)
+    # default_duration = int(match.group()) if match else 3
+
+    # "date": st.session_state.contract_data["date"],
+    # "client_company_name": st.session_state.contract_data["client_company_name"],
+    # "client_name": st.session_state.contract_data['client_name'],
+    # "client_address": st.session_state.contract_data["client_company_address"],
+    # "contract_end": st.session_state.contract_data["contract_end"],
 
     # Initialize session state for multi-page form
     if 'contract_form_step' not in st.session_state:
@@ -869,11 +977,11 @@ def handle_contract():
     if st.session_state.contract_form_step == 1:
         # Step 1: Collect information
         with st.form("contract_form"):
-            date = st.date_input("Contract Date")
-            client_company_name = st.text_input("Client Company Name")
-            client_name = st.text_input("Client Name")
-            client_company_address = st.text_area("Client Company Address")
-            contract_end = st.date_input("Contract End Date")
+            date = st.date_input("Contract Date", value=default_date)
+            client_company_name = st.text_input("Client Company Name", value=default_client_company_name, placeholder="HVT")
+            client_name = st.text_input("Client Name", value=default_name, placeholder="Jon Lain")
+            client_company_address = st.text_area("Client Company Address", value=default_client_address, placeholder="2 Street, NY.")
+            contract_end = st.date_input("Contract End Date", default_contract_end)
 
             if st.form_submit_button("Generate Contract"):
                 st.session_state.contract_data = {
@@ -1032,6 +1140,16 @@ def handle_contract():
 
 def handle_nda():
     st.title("📄 NDA Form")
+    regenerate_data = st.session_state.get('regenerate_data', {})
+    is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "NDA"
+    metadata = regenerate_data.get('metadata', {})
+
+    default_date = datetime.strptime(
+        metadata.get("date", datetime.now().strftime('%d/%m/%Y')), '%d/%m/%Y').date()
+    default_name = metadata.get("client_name", "")
+    default_client_company_name = metadata.get("client_company_name", "")
+    default_client_address = metadata.get("client_address", "")
+
 
     # Initialize session state for multi-page form
     if 'nda_form_step' not in st.session_state:
@@ -1041,10 +1159,10 @@ def handle_nda():
     if st.session_state.nda_form_step == 1:
         # Step 1: Collect information
         with st.form("nda_form"):
-            date = st.date_input("Agreement Date")
-            client_name = st.text_input("Client Name")
-            client_company_name = st.text_input("Client Company Name")
-            client_company_address = st.text_area("Client Company Address")
+            date = st.date_input("Agreement Date", value=default_date)
+            client_name = st.text_input("Client Name", value=default_name)
+            client_company_name = st.text_input("Client Company Name", value=default_client_company_name)
+            client_company_address = st.text_area("Client Company Address", value=default_client_address)
 
             if st.form_submit_button("Generate NDA"):
                 st.session_state.nda_data = {
@@ -1208,6 +1326,9 @@ def handle_nda():
 
 def handle_invoice():
     st.title("📄 Invoice Generator")
+    regenerate_data = st.session_state.get('regenerate_data', {})
+    is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Internship"
+    metadata = regenerate_data.get('metadata', {})
 
     # Initialize session state for multi-page form
     if 'invoice_form_step' not in st.session_state:
@@ -1621,180 +1742,6 @@ def handle_invoice():
             pass
 
 
-# def handle_contract():
-#     st.title("📄 Contract Form")
-#
-#     # Initialize session state for multi-page form
-#     if 'contract_form_step' not in st.session_state:
-#         st.session_state.contract_form_step = 1
-#         st.session_state.contract_data = {}
-#
-#     if st.session_state.contract_form_step == 1:
-#         # Step 1: Collect information
-#         with st.form("contract_form"):
-#             date = st.date_input("Contract Date")
-#             client_company_name = st.text_input("Client Company Name")
-#             client_name = st.text_input("Client Name")
-#             client_company_address = st.text_area("Client Company Address")
-#             contract_end = st.date_input("Contract End Date")
-#
-#             if st.form_submit_button("Generate Contract"):
-#                 st.session_state.contract_data = {
-#                     "date": date.strftime("%B %d, %Y"),
-#                     "client_company_name": client_company_name,
-#                     "client_name": client_name,
-#                     "client_company_address": client_company_address,
-#                     "contract_end": contract_end.strftime("%B %d, %Y")
-#                 }
-#                 st.session_state.contract_form_step = 2
-#                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
-#
-#     elif st.session_state.contract_form_step == 2:
-#         # Step 2: Preview and download
-#         # st.success("Contract generated successfully!")
-#         with st.spinner("Loading template and generating offer..."):
-#             st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'contract_form_step', 1))
-#
-#             # Prepare context data
-#             context = {
-#                 "date": st.session_state.contract_data["date"],
-#                 "client_company_name": st.session_state.contract_data["client_company_name"],
-#                 "client_name": f"        {st.session_state.contract_data['client_name']}",
-#                 "client_address": st.session_state.contract_data["client_company_address"],
-#                 "contract_end": st.session_state.contract_data["contract_end"],
-#             }
-#
-#             # Get template from Firestore
-#             doc_type = "Contract"  # Adjust if your collection name is different
-#             try:
-#                 template_ref = firestore_db.collection("hvt_generator").document(doc_type)
-#                 templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
-#
-#                 if not templates:
-#                     st.error(f"No templates found in the database for {doc_type}")
-#                     return
-#
-#                 # Get the first template (order_number = 1)
-#                 template_doc = templates[0]
-#                 template_data = template_doc.to_dict()
-#
-#                 # Visibility check
-#                 if template_data.get('visibility', 'Private') != 'Public':
-#                     st.error("This contract template is not currently available")
-#                     return
-#
-#                 # File type check
-#                 if template_data.get(
-#                         'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-#                     st.error("Template is not a valid Word document (.docx)")
-#                     return
-#
-#                 # Check if storage_path exists
-#                 if 'storage_path' not in template_data:
-#                     st.error("Template storage path not found in the database")
-#                     return
-#
-#                 # Download the template file from Firebase Storage
-#                 # bucket = storage.bucket()
-#                 blob = bucket.blob(template_data['storage_path'])
-#
-#                 # Create a temporary file for the template
-#                 with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
-#                     blob.download_to_filename(temp_template.name)
-#                     template_path = temp_template.name
-#
-#             except Exception as e:
-#                 st.error(f"Error fetching template: {str(e)}")
-#                 return
-#
-#             # Generate temporary files
-#             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf, \
-#                     tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_docx:
-#
-#                 pdf_output = temp_pdf.name
-#                 docx_output = temp_docx.name
-#
-#                 # Use the downloaded template
-#                 nda_edit(template_path, docx_output, context)
-#                 main_converter(docx_output, pdf_output)
-#
-#             # Preview section
-#             st.subheader("Preview")
-#             st.write(f"**Contract Date:** {st.session_state.contract_data['date']}")
-#             st.write(f"**Client Name:** {st.session_state.contract_data['client_name']}")
-#             st.write(f"**Client Company Name:** {st.session_state.contract_data['client_company_name']}")
-#             st.write(f"**Client Address:** {st.session_state.contract_data['client_company_address']}")
-#             st.write(f"**Contract End Date:** {st.session_state.contract_data['contract_end']}")
-#
-#             # PDF preview (requires pdfplumber)
-#             pdf_view(pdf_output)
-#
-#             file_upload_details = {
-#                 "client_name": st.session_state.contract_data['client_name'],
-#                 "company_name": st.session_state.contract_data['client_company_name'],
-#                 "address": st.session_state.contract_data['client_company_address'],
-#                 "contract_date": st.session_state.contract_data['date'],
-#                 "contract_end_date": st.session_state.contract_data['contract_end'],
-#                 "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-#                 "upload_timestamp": firestore.SERVER_TIMESTAMP,
-#             }
-#
-#             # Download buttons
-#             st.subheader("Download Documents")
-#             col1, col2 = st.columns(2)
-#
-#             with col1:
-#                 # generate_download_link(pdf_output,
-#                 #                        f"{st.session_state.contract_data['client_company_name']} "
-#                 #                        f"Contract.pdf",
-#                 #                        "PDF", "Contract")
-#                 if st.button("✅ Confirm and Upload Contract PDF", key="upload_pdf"):
-#                     # storage_path, public_url = save_generated_file_to_firebase(pdf_output, doc_type="Contract",
-#                     #                                                            bucket=bucket)
-#                     save_generated_file_to_firebase_2(
-#                         pdf_output,
-#                         "Contract",
-#                         bucket,
-#                         "PDF",
-#                         file_upload_details
-#                     )
-#
-#                     st.success("Now you can download the file:")
-#                     # Step 2: Show download link only after upload
-#                     generate_download_link(pdf_output,
-#                                            f"{st.session_state.contract_data['client_company_name']} Contract.pdf",
-#                                            "PDF", "Contract")
-#             with col2:
-#
-#                 # Step 1: Confirm and upload
-#                 if st.button("✅ Confirm and Upload Contract DOCX", key="upload_docx"):
-#                     storage_path, public_url = save_generated_file_to_firebase(docx_output, doc_type="Contract",
-#                                                                                bucket=bucket)
-#                     save_generated_file_to_firebase_2(
-#                         docx_output,
-#                         "Contract",
-#                         bucket,
-#                         "DOCX",
-#                         file_upload_details
-#                     )
-#
-#                     st.success("Now you can download the file:")
-#                     # Step 2: Show download link only after upload
-#                     generate_download_link(docx_output,
-#                                            f"{st.session_state.contract_data['client_company_name']} Contract.docx",
-#                                            "DOCX", "Contract")
-#
-#
-#         # Clean up temp files
-#         try:
-#             import os
-#             os.unlink(template_path)
-#             os.unlink(pdf_output)
-#             os.unlink(docx_output)
-#         except Exception as e:
-#             st.warning(f"Error cleaning up temporary files: {str(e)}")
-
-
 def fetch_proposal_templates_to_temp_dir(firestore_db, bucket):
     base_temp_dir = tempfile.mkdtemp(prefix="proposal_templates_")
 
@@ -1963,6 +1910,27 @@ def align_text_fixed_width(text, total_char_width=12, alignment='center'):
 
 def handle_proposal():
     st.title("📄 Proposal Form")
+    regenerate_data = st.session_state.get('regenerate_data', {})
+    is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Proposal"
+    metadata = regenerate_data.get('metadata', {})
+    # "client_name": st.session_state.proposal_data['client_name'],
+    # "company_name": st.session_state.proposal_data['company_name'],
+    # "email": st.session_state.proposal_data['email'],
+    # "phone": st.session_state.proposal_data['phone'],
+    # "country": st.session_state.proposal_data['country'],
+    # "proposal_date": st.session_state.proposal_data['proposal_date'],
+
+    default_date = datetime.strptime(
+        metadata.get("date", datetime.now().strftime('%d-%m-%Y')), '%d-%m-%Y').date()
+    default_name = metadata.get("client_name", "")
+    default_company_name = metadata.get("company_name", "")
+    default_email = metadata.get("email", "")
+    default_phone = metadata.get("phone", "")
+    default_country = metadata.get("country", "")
+    default_client_address = metadata.get("client_address", "")
+    default_proposal_date = datetime.strptime(
+        metadata.get("proposal_date", datetime.now().strftime('%d-%m-%Y')), '%d-%m-%Y').date()
+
     st.session_state.setdefault("proposal_data", {})
     st.session_state.setdefault("proposal_form_step", 1)
     space_ = " "
@@ -1982,13 +1950,13 @@ def handle_proposal():
     if st.session_state.proposal_form_step == 1:
         with st.form("proposal_form_step1"):
             st.subheader("Client Information")
-            name = st.text_input("Client Name")
-            company = st.text_input("Company Name")
-            email = st.text_input("Email")
-            phone = st.text_input("Phone")
+            name = st.text_input("Client Name", value=default_name)
+            company = st.text_input("Company Name", value=default_company_name)
+            email = st.text_input("Email", value=default_email)
+            phone = st.text_input("Phone", value=default_phone, placeholder="+1 234 5678")
             countries = sorted([country.name for country in pycountry.countries])
-            country = st.selectbox("Select Country", countries)
-            proposal_date = st.date_input("Proposal Date")
+            country = st.selectbox("Select Country", countries,)
+            proposal_date = st.date_input("Proposal Date", value=default_proposal_date)
 
             if st.form_submit_button("Next: Select Cover Page"):
                 st.session_state.proposal_data = {
