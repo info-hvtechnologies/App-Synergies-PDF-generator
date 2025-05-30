@@ -753,6 +753,11 @@ def handle_relieving_letter():
                                            '%d-%m-%Y').date()
 
     default_duration = metadata.get("duration", "3")
+    if isinstance(default_duration, str):
+        match = re.search(r"\d+", default_duration)
+        default_duration = int(match.group()) if match else 3
+    else:
+        default_duration = int(default_duration)
 
     # Initialize session state for multi-page form
     if 'relieving_letter_form_step' not in st.session_state:
