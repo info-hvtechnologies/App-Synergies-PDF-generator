@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import streamlit as st
 from dotenv import load_dotenv
 from firebase_conf import auth, rt_db, bucket, firestore_db
-from document_handlers import (handle_internship_certificate, handle_internship_offer, handle_relieving_letter, handle_invoice,
+from document_handlers import (handle_internship_certificate, handle_internship_offer, handle_relieving_letter, handle_nda,
                                handle_contract, handle_proposal)
 from google.cloud import firestore
 from google.cloud.firestore_v1 import SERVER_TIMESTAMP
@@ -18,100 +18,6 @@ from load_config import LOAD_LOCALLY
 load_dotenv()
 
 # LOAD_LOCALLY = False
-from streamlit.components.v1 import html
-def streamlit_style_password_input(label="Password", key="password_input"):
-    show_password = st.checkbox("Show password", key=f"{key}_show")
-
-    if show_password:
-        return st.text_input(label, type="default", key=key)
-    else:
-        return st.text_input(label, type="password", key=key)
-
-def twitter_like_password_field(label="Password"):
-    container_id = f"pw_container_{hash(label)}"
-    input_id = f"pw_input_{hash(label)}"
-    button_id = f"pw_button_{hash(label)}"
-
-    # Streamlit dark mode colors
-    primary_color = "#F63366"     # Streamlit pink
-    bg_color = "#0e1117"          # Input field background
-    text_color = "#FFFFFF"        # Input text color
-    border_color = "#333"         # Subtle border
-    focus_color = bg_color   # Border/focus
-
-    css = f"""
-        <style>
-            #{container_id} {{
-                position: relative;
-                margin-bottom: 1rem;
-                margin-left: -0.5rem;  /* 👈 Moves the entire field to the left */
-            }}
-            #{input_id} {{
-                width: 100%;
-                height: 2rem; /* <-- Explicit height (adjust as needed) */
-                padding: 0.5rem;
-                padding-right: 2.5rem;
-                border: 1px  {border_color};
-                border-radius: 0.375rem 0.375rem 0.375rem 0.375rem;
-
-                font-size: 1rem;
-                font-family: inherit;
-                background-color: {bg_color};
-                color: {text_color};
-            }}
-            #{button_id} {{
-                position: absolute;
-                right: 0.5rem;
-                top: 50%;
-                transform: translateY(-50%);
-                background: none;
-                border: none;
-                color: {primary_color};
-                cursor: pointer;
-                font-size: 0.875rem;
-                font-weight: 600;
-            }}
-            #{input_id}:focus {{
-                outline: none;
-                border-color: {focus_color};
-                box-shadow: 0 0 0 1px {focus_color};
-            }}
-        </style>
-        """
-
-    js = f"""
-    <script>
-        function togglePasswordVisibility() {{
-            const input = document.getElementById("{input_id}");
-            const button = document.getElementById("{button_id}");
-
-            if (input.type === "password") {{
-                input.type = "text";
-                button.textContent = "Hide";
-            }} else {{
-                input.type = "password";
-                button.textContent = "Show";
-            }}
-        }}
-    </script>
-    """
-
-    html_code = f"""
-    {css}
-    {js}
-    <div id="{container_id}">
-        <input type="password" id="{input_id}" placeholder="{label}" />
-        <button id="{button_id}" type="button" onclick="togglePasswordVisibility()">Show</button>
-    </div>
-    """
-
-    html(html_code, height=60)
-
-    # You can optionally add value tracking here
-    if f'pw_{input_id}' not in st.session_state:
-        st.session_state[f'pw_{input_id}'] = ""
-
-    return st.session_state[f'pw_{input_id}']
 
 
 def cleanup_broken_metadata():
@@ -179,8 +85,9 @@ DOCUMENT_TYPES = [
     "Internship Certificate",
     "Internship Offer",
     "Relieving Letter",
-    # "Contract",
-    # "Proposal",
+    "NDA",
+    "Contract",
+    "Proposal",
     "Admin Panel"
 ]
 
@@ -233,7 +140,7 @@ if selected_option == "Admin Panel":
             # )
             doc_type = st.selectbox(
                 "Select Document Type",
-                ["Internship Certificate", "Internship Offer", "Relieving Letter"],
+                ["Internship Certificate", "Internship Offer", "Relieving Letter", "NDA", "Contract", "Proposal"],
                 key="doc_type_select"
             )
 
@@ -558,12 +465,13 @@ if selected_option == "Admin Panel":
         #      # "Proposal",
         #      "Internship Positions"
         #      ])
-        tab1, tab2, tab3, tab4 = st.tabs(
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
             ["Internship Certificate",
              "Internship Offer",
              "Relieving Letter",
-             # "Contract",
-             # "Proposal",
+             "NDA",
+             "Contract",
+             "Proposal",
              "Internship Positions"
              ])
 
@@ -578,13 +486,16 @@ if selected_option == "Admin Panel":
         with tab3:
             show_templates_tab("Relieving Letter")
 
-        # with tab4:
-        #     show_templates_tab("Contract")
-        #
-        # with tab5:
-        #     show_templates_tab("Proposal")
-
         with tab4:
+            show_templates_tab("NDA")
+
+        with tab5:
+            show_templates_tab("Contract")
+
+        with tab6:
+            show_templates_tab("Proposal")
+
+        with tab7:
             manage_internship_roles_tab()
 
 
@@ -600,11 +511,13 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
     #     "Contract",
     #     "Proposal"
     # ])
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Internship",
         "Internship Offer",
-        "Relieving Letter"
-
+        "Relieving Letter",
+        "NDA",
+        "Contract",
+        "Proposal"
     ])
 
 
@@ -766,11 +679,14 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
     with tab3:
         display_documents_by_type("Relieving Letter")
 
-    # with tab4:
-    #     display_documents_by_type("Contract")
-    #
-    # with tab5:
-    #     display_documents_by_type("Proposal")
+    with tab4:
+        display_documents_by_type("NDA")
+
+    with tab5:
+        display_documents_by_type("Contract")
+
+    with tab6:
+        display_documents_by_type("Proposal")
 
 # Handle document types
 elif selected_option == "Internship Certificate":
@@ -782,8 +698,11 @@ elif selected_option == "Internship Offer":
 elif selected_option == "Relieving Letter":
     handle_relieving_letter()
 
-# elif selected_option == "Contract":
-#     handle_contract()
-#
-# elif selected_option == "Proposal":
-#     handle_proposal()
+elif selected_option == "NDA":
+    handle_nda()
+
+elif selected_option == "Contract":
+    handle_contract()
+
+elif selected_option == "Proposal":
+    handle_proposal()

@@ -858,6 +858,354 @@ def handle_relieving_letter():
             pass
 
 
+def handle_contract():
+    st.title("📄 Contract Form")
+
+    # Initialize session state for multi-page form
+    if 'contract_form_step' not in st.session_state:
+        st.session_state.contract_form_step = 1
+        st.session_state.contract_data = {}
+
+    if st.session_state.contract_form_step == 1:
+        # Step 1: Collect information
+        with st.form("contract_form"):
+            date = st.date_input("Contract Date")
+            client_company_name = st.text_input("Client Company Name")
+            client_name = st.text_input("Client Name")
+            client_company_address = st.text_area("Client Company Address")
+            contract_end = st.date_input("Contract End Date")
+
+            if st.form_submit_button("Generate Contract"):
+                st.session_state.contract_data = {
+                    "date": f"{date.day}/{date.month}/{date.year}",
+                    "client_company_name": client_company_name,
+                    "client_name": client_name,
+                    "client_company_address": client_company_address,
+                    "contract_end": f"{contract_end.day}/{contract_end.month}/{contract_end.year}"
+                }
+                st.session_state.contract_form_step = 2
+                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    elif st.session_state.contract_form_step == 2:
+        # Step 2: Preview and download
+        # st.success("NDA generated successfully!")
+        with st.spinner("Loading template and generating contract..."):
+            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'contract_form_step', 1))
+
+           # Generate documents
+            replacements_docx = {
+                "date": st.session_state.contract_data["date"],
+                "client_company_name": st.session_state.contract_data["client_company_name"],
+                "client_name": f"        {st.session_state.contract_data['client_name']}",
+                "client_address": st.session_state.contract_data["client_company_address"],
+                "contract_end": st.session_state.contract_data["contract_end"],
+            }
+
+            # Get template from Firestore
+            doc_type = "Contract"  # Changed to match your collection name
+            try:
+                template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+                templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
+
+                if not templates:
+                    st.error("No templates found in the database for Internship Offer")
+                    return
+
+                # Get the first template (order_number = 1)
+
+                template_doc = templates[0]
+                template_data = template_doc.to_dict()
+
+                # Visibility check
+                if template_data.get('visibility', 'Private') != 'Public':
+                    st.error("This Offer template is not currently available")
+                    return
+
+                # File type check
+                if template_data.get(
+                        'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                    st.error("Template is not a valid Word document (.docx)")
+                    return
+
+                # Check if storage_path exists
+                if 'storage_path' not in template_data:
+                    st.error("Template storage path not found in the database")
+                    return
+
+                # Download the template file from Firebase Storage
+                # bucket = storage.bucket()
+                blob = bucket.blob(template_data['storage_path'])
+
+                # Create a temporary file for the template
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
+                    blob.download_to_filename(temp_template.name)
+                    template_path = temp_template.name
+
+            except Exception as e:
+                st.error(f"Error fetching template: {str(e)}")
+                return
+
+            # Generate temporary files
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf, \
+                    tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_docx:
+
+                pdf_output = temp_pdf.name
+                docx_output = temp_docx.name
+
+                # Use the downloaded template
+                # offer_edit(template_path, docx_output, replacements_docx)
+                nda_edit(template_path, docx_output, replacements_docx)
+                main_converter(docx_output, pdf_output)
+
+            # Preview section
+            st.subheader("Preview")
+            st.write(f"**Agreement Date:** {st.session_state.contract_data['date']}")
+            st.write(f"**Client Name:** {st.session_state.contract_data['client_name']}")
+            st.write(f"**Company Name:** {st.session_state.contract_data['client_company_name']}")
+            st.write(f"**Company Address:** {st.session_state.contract_data['client_company_address']}")
+            st.write(f"**Contract End Date:** {st.session_state.contract_data['contract_end']}")
+
+            # PDF preview (requires pdfplumber)
+            pdf_view(pdf_output)
+
+            # Download buttons
+            st.subheader("Download Documents")
+            col1, col2 = st.columns(2)
+
+            file_upload_details = {
+                "date": st.session_state.contract_data["date"],
+                "client_company_name": st.session_state.contract_data["client_company_name"],
+                "client_name": st.session_state.contract_data['client_name'],
+                "client_address": st.session_state.contract_data["client_company_address"],
+                "contract_end": st.session_state.contract_data["contract_end"],
+
+                "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "upload_timestamp": firestore.SERVER_TIMESTAMP,
+            }
+
+            with col1:
+
+                if st.button("✅ Confirm and Upload Contract PDF", key="upload_pdf"):
+
+                    save_generated_file_to_firebase_2(
+                        pdf_output,
+                        "Contract",
+                        bucket,
+                        "PDF",
+                        file_upload_details
+                    )
+
+                    st.success("Now you can download the file:")
+                    # Step 2: Show download link only after upload
+                    generate_download_link(pdf_output,
+                                           f"{st.session_state.contract_data['client_name']} {st.session_state.contract_data['client_company_name']} contract.pdf",
+                                           "PDF", "Contract")
+
+
+            with col2:
+
+                if st.button("✅ Confirm and Upload Contract DOCX", key="upload_docx"):
+
+                    save_generated_file_to_firebase_2(
+                        docx_output,
+                        "Contract",
+                        bucket,
+                        "DOCX",
+                        file_upload_details
+                    )
+
+                    st.success("Now you can download the file:")
+                    # Step 2: Show download link only after upload
+                    generate_download_link(docx_output,
+                                           f"{st.session_state.contract_data['client_name']} {st.session_state.contract_data['client_company_name']} contract.docx",
+                                           "DOCX", "Contract")
+
+        # Clean up temp files
+        try:
+            import os
+            os.unlink(template_path)
+            os.unlink(pdf_output)
+            os.unlink(docx_output)
+        except:
+            pass
+
+
+def handle_nda():
+    st.title("📄 NDA Form")
+
+    # Initialize session state for multi-page form
+    if 'nda_form_step' not in st.session_state:
+        st.session_state.nda_form_step = 1
+        st.session_state.nda_data = {}
+
+    if st.session_state.nda_form_step == 1:
+        # Step 1: Collect information
+        with st.form("nda_form"):
+            date = st.date_input("Agreement Date")
+            client_name = st.text_input("Client Name")
+            client_company_name = st.text_input("Client Company Name")
+            client_company_address = st.text_area("Client Company Address")
+
+            if st.form_submit_button("Generate NDA"):
+                st.session_state.nda_data = {
+                    "date": f"{date.day}/{date.month}/{date.year}",
+                    "client_company_name": client_company_name,
+                    "client_name": client_name,
+                    "client_company_address": client_company_address,
+                }
+                st.session_state.nda_form_step = 2
+                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    elif st.session_state.nda_form_step == 2:
+        # Step 2: Preview and download
+        # st.success("NDA generated successfully!")
+        with st.spinner("Loading template and generating agreement..."):
+            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'nda_form_step', 1))
+
+            the_name = st.session_state.nda_data['client_name']
+            space_ = " "
+            if len(the_name) >= 9:
+                lenght_dif = len(the_name) - 9
+                new_text = f"{space_ * lenght_dif}      {the_name}"
+            elif len(the_name) < 9:
+                lenght_dif = 9 - len(the_name)
+                new_text = f"{space_ * lenght_dif}      {the_name}"
+            else:
+                new_text = the_name
+            # Generate documents
+            replacements_docx = {
+                "date": st.session_state.nda_data["date"],
+                # "client_name": f" {st.session_state.nda_data['client_name']}",
+                "client_name": new_text,
+                "client_company_name": st.session_state.nda_data["client_company_name"],
+                "client_company_address": st.session_state.nda_data["client_company_address"]
+            }
+
+
+            # Get template from Firestore
+            doc_type = "NDA"  # Changed to match your collection name
+            try:
+                template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+                templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
+
+                if not templates:
+                    st.error("No templates found in the database for Internship Offer")
+                    return
+
+                # Get the first template (order_number = 1)
+
+                template_doc = templates[0]
+                template_data = template_doc.to_dict()
+
+                # Visibility check
+                if template_data.get('visibility', 'Private') != 'Public':
+                    st.error("This Offer template is not currently available")
+                    return
+
+                # File type check
+                if template_data.get(
+                        'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                    st.error("Template is not a valid Word document (.docx)")
+                    return
+
+                # Check if storage_path exists
+                if 'storage_path' not in template_data:
+                    st.error("Template storage path not found in the database")
+                    return
+
+                # Download the template file from Firebase Storage
+                # bucket = storage.bucket()
+                blob = bucket.blob(template_data['storage_path'])
+
+                # Create a temporary file for the template
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
+                    blob.download_to_filename(temp_template.name)
+                    template_path = temp_template.name
+
+            except Exception as e:
+                st.error(f"Error fetching template: {str(e)}")
+                return
+
+            # Generate temporary files
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf, \
+                    tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_docx:
+
+                pdf_output = temp_pdf.name
+                docx_output = temp_docx.name
+
+                # Use the downloaded template
+                # offer_edit(template_path, docx_output, replacements_docx)
+                nda_edit(template_path, docx_output, replacements_docx)
+                main_converter(docx_output, pdf_output)
+
+            # Preview section
+            st.subheader("Preview")
+            st.write(f"**Agreement Date:** {st.session_state.nda_data['date']}")
+            st.write(f"**Client Name:** {st.session_state.nda_data['client_name']}")
+            st.write(f"**Company Name:** {st.session_state.nda_data['client_company_name']}")
+            st.write(f"**Company Address:** {st.session_state.nda_data['client_company_address']}")
+
+            # PDF preview (requires pdfplumber)
+            pdf_view(pdf_output)
+
+            # Download buttons
+            st.subheader("Download Documents")
+            col1, col2 = st.columns(2)
+
+            file_upload_details = {
+                "date": st.session_state.nda_data["date"],
+                "client_company_name": st.session_state.nda_data["client_company_name"],
+                "client_name": st.session_state.nda_data['client_name'],
+                "client_address": st.session_state.nda_data["client_company_address"],
+
+                "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "upload_timestamp": firestore.SERVER_TIMESTAMP,
+            }
+
+            with col1:
+
+                if st.button("✅ Confirm and Upload NDA PDF", key="upload_pdf"):
+                    save_generated_file_to_firebase_2(
+                        pdf_output,
+                        "NDA",
+                        bucket,
+                        "PDF",
+                        file_upload_details
+                    )
+
+                    st.success("Now you can download the file:")
+                    # Step 2: Show download link only after upload
+                    generate_download_link(pdf_output,
+                                           f"{st.session_state.nda_data['client_name']} {st.session_state.nda_data['client_company_name']} nda.pdf",
+                                           "PDF", "Contract")
+
+            with col2:
+
+                if st.button("✅ Confirm and Upload NDA DOCX", key="upload_docx"):
+                    save_generated_file_to_firebase_2(
+                        docx_output,
+                        "NDA",
+                        bucket,
+                        "DOCX",
+                        file_upload_details
+                    )
+
+                    st.success("Now you can download the file:")
+                    # Step 2: Show download link only after upload
+                    generate_download_link(docx_output,
+                                           f"{st.session_state.nda_data['client_name']} {st.session_state.nda_data['client_company_name']} contract.docx",
+                                           "DOCX", "NDA")
+
+        # Clean up temp files
+        try:
+            import os
+            os.unlink(template_path)
+            os.unlink(pdf_output)
+            os.unlink(docx_output)
+        except:
+            pass
+
+
 def handle_invoice():
     st.title("📄 Invoice Generator")
 
@@ -1273,178 +1621,178 @@ def handle_invoice():
             pass
 
 
-def handle_contract():
-    st.title("📄 Contract Form")
-
-    # Initialize session state for multi-page form
-    if 'contract_form_step' not in st.session_state:
-        st.session_state.contract_form_step = 1
-        st.session_state.contract_data = {}
-
-    if st.session_state.contract_form_step == 1:
-        # Step 1: Collect information
-        with st.form("contract_form"):
-            date = st.date_input("Contract Date")
-            client_company_name = st.text_input("Client Company Name")
-            client_name = st.text_input("Client Name")
-            client_company_address = st.text_area("Client Company Address")
-            contract_end = st.date_input("Contract End Date")
-
-            if st.form_submit_button("Generate Contract"):
-                st.session_state.contract_data = {
-                    "date": date.strftime("%B %d, %Y"),
-                    "client_company_name": client_company_name,
-                    "client_name": client_name,
-                    "client_company_address": client_company_address,
-                    "contract_end": contract_end.strftime("%B %d, %Y")
-                }
-                st.session_state.contract_form_step = 2
-                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
-
-    elif st.session_state.contract_form_step == 2:
-        # Step 2: Preview and download
-        # st.success("Contract generated successfully!")
-        with st.spinner("Loading template and generating offer..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'contract_form_step', 1))
-
-            # Prepare context data
-            context = {
-                "date": st.session_state.contract_data["date"],
-                "client_company_name": st.session_state.contract_data["client_company_name"],
-                "client_name": f"        {st.session_state.contract_data['client_name']}",
-                "client_address": st.session_state.contract_data["client_company_address"],
-                "contract_end": st.session_state.contract_data["contract_end"],
-            }
-
-            # Get template from Firestore
-            doc_type = "Contract"  # Adjust if your collection name is different
-            try:
-                template_ref = firestore_db.collection("hvt_generator").document(doc_type)
-                templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
-
-                if not templates:
-                    st.error(f"No templates found in the database for {doc_type}")
-                    return
-
-                # Get the first template (order_number = 1)
-                template_doc = templates[0]
-                template_data = template_doc.to_dict()
-
-                # Visibility check
-                if template_data.get('visibility', 'Private') != 'Public':
-                    st.error("This contract template is not currently available")
-                    return
-
-                # File type check
-                if template_data.get(
-                        'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                    st.error("Template is not a valid Word document (.docx)")
-                    return
-
-                # Check if storage_path exists
-                if 'storage_path' not in template_data:
-                    st.error("Template storage path not found in the database")
-                    return
-
-                # Download the template file from Firebase Storage
-                # bucket = storage.bucket()
-                blob = bucket.blob(template_data['storage_path'])
-
-                # Create a temporary file for the template
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
-                    blob.download_to_filename(temp_template.name)
-                    template_path = temp_template.name
-
-            except Exception as e:
-                st.error(f"Error fetching template: {str(e)}")
-                return
-
-            # Generate temporary files
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf, \
-                    tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_docx:
-
-                pdf_output = temp_pdf.name
-                docx_output = temp_docx.name
-
-                # Use the downloaded template
-                nda_edit(template_path, docx_output, context)
-                main_converter(docx_output, pdf_output)
-
-            # Preview section
-            st.subheader("Preview")
-            st.write(f"**Contract Date:** {st.session_state.contract_data['date']}")
-            st.write(f"**Client Name:** {st.session_state.contract_data['client_name']}")
-            st.write(f"**Client Company Name:** {st.session_state.contract_data['client_company_name']}")
-            st.write(f"**Client Address:** {st.session_state.contract_data['client_company_address']}")
-            st.write(f"**Contract End Date:** {st.session_state.contract_data['contract_end']}")
-
-            # PDF preview (requires pdfplumber)
-            pdf_view(pdf_output)
-
-            file_upload_details = {
-                "client_name": st.session_state.contract_data['client_name'],
-                "company_name": st.session_state.contract_data['client_company_name'],
-                "address": st.session_state.contract_data['client_company_address'],
-                "contract_date": st.session_state.contract_data['date'],
-                "contract_end_date": st.session_state.contract_data['contract_end'],
-                "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "upload_timestamp": firestore.SERVER_TIMESTAMP,
-            }
-
-            # Download buttons
-            st.subheader("Download Documents")
-            col1, col2 = st.columns(2)
-
-            with col1:
-                # generate_download_link(pdf_output,
-                #                        f"{st.session_state.contract_data['client_company_name']} "
-                #                        f"Contract.pdf",
-                #                        "PDF", "Contract")
-                if st.button("✅ Confirm and Upload Contract PDF", key="upload_pdf"):
-                    # storage_path, public_url = save_generated_file_to_firebase(pdf_output, doc_type="Contract",
-                    #                                                            bucket=bucket)
-                    save_generated_file_to_firebase_2(
-                        pdf_output,
-                        "Contract",
-                        bucket,
-                        "PDF",
-                        file_upload_details
-                    )
-
-                    st.success("Now you can download the file:")
-                    # Step 2: Show download link only after upload
-                    generate_download_link(pdf_output,
-                                           f"{st.session_state.contract_data['client_company_name']} Contract.pdf",
-                                           "PDF", "Contract")
-            with col2:
-
-                # Step 1: Confirm and upload
-                if st.button("✅ Confirm and Upload Contract DOCX", key="upload_docx"):
-                    storage_path, public_url = save_generated_file_to_firebase(docx_output, doc_type="Contract",
-                                                                               bucket=bucket)
-                    save_generated_file_to_firebase_2(
-                        docx_output,
-                        "Contract",
-                        bucket,
-                        "DOCX",
-                        file_upload_details
-                    )
-
-                    st.success("Now you can download the file:")
-                    # Step 2: Show download link only after upload
-                    generate_download_link(docx_output,
-                                           f"{st.session_state.contract_data['client_company_name']} Contract.docx",
-                                           "DOCX", "Contract")
-
-
-        # Clean up temp files
-        try:
-            import os
-            os.unlink(template_path)
-            os.unlink(pdf_output)
-            os.unlink(docx_output)
-        except Exception as e:
-            st.warning(f"Error cleaning up temporary files: {str(e)}")
+# def handle_contract():
+#     st.title("📄 Contract Form")
+#
+#     # Initialize session state for multi-page form
+#     if 'contract_form_step' not in st.session_state:
+#         st.session_state.contract_form_step = 1
+#         st.session_state.contract_data = {}
+#
+#     if st.session_state.contract_form_step == 1:
+#         # Step 1: Collect information
+#         with st.form("contract_form"):
+#             date = st.date_input("Contract Date")
+#             client_company_name = st.text_input("Client Company Name")
+#             client_name = st.text_input("Client Name")
+#             client_company_address = st.text_area("Client Company Address")
+#             contract_end = st.date_input("Contract End Date")
+#
+#             if st.form_submit_button("Generate Contract"):
+#                 st.session_state.contract_data = {
+#                     "date": date.strftime("%B %d, %Y"),
+#                     "client_company_name": client_company_name,
+#                     "client_name": client_name,
+#                     "client_company_address": client_company_address,
+#                     "contract_end": contract_end.strftime("%B %d, %Y")
+#                 }
+#                 st.session_state.contract_form_step = 2
+#                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+#
+#     elif st.session_state.contract_form_step == 2:
+#         # Step 2: Preview and download
+#         # st.success("Contract generated successfully!")
+#         with st.spinner("Loading template and generating offer..."):
+#             st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'contract_form_step', 1))
+#
+#             # Prepare context data
+#             context = {
+#                 "date": st.session_state.contract_data["date"],
+#                 "client_company_name": st.session_state.contract_data["client_company_name"],
+#                 "client_name": f"        {st.session_state.contract_data['client_name']}",
+#                 "client_address": st.session_state.contract_data["client_company_address"],
+#                 "contract_end": st.session_state.contract_data["contract_end"],
+#             }
+#
+#             # Get template from Firestore
+#             doc_type = "Contract"  # Adjust if your collection name is different
+#             try:
+#                 template_ref = firestore_db.collection("hvt_generator").document(doc_type)
+#                 templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
+#
+#                 if not templates:
+#                     st.error(f"No templates found in the database for {doc_type}")
+#                     return
+#
+#                 # Get the first template (order_number = 1)
+#                 template_doc = templates[0]
+#                 template_data = template_doc.to_dict()
+#
+#                 # Visibility check
+#                 if template_data.get('visibility', 'Private') != 'Public':
+#                     st.error("This contract template is not currently available")
+#                     return
+#
+#                 # File type check
+#                 if template_data.get(
+#                         'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+#                     st.error("Template is not a valid Word document (.docx)")
+#                     return
+#
+#                 # Check if storage_path exists
+#                 if 'storage_path' not in template_data:
+#                     st.error("Template storage path not found in the database")
+#                     return
+#
+#                 # Download the template file from Firebase Storage
+#                 # bucket = storage.bucket()
+#                 blob = bucket.blob(template_data['storage_path'])
+#
+#                 # Create a temporary file for the template
+#                 with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
+#                     blob.download_to_filename(temp_template.name)
+#                     template_path = temp_template.name
+#
+#             except Exception as e:
+#                 st.error(f"Error fetching template: {str(e)}")
+#                 return
+#
+#             # Generate temporary files
+#             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf, \
+#                     tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_docx:
+#
+#                 pdf_output = temp_pdf.name
+#                 docx_output = temp_docx.name
+#
+#                 # Use the downloaded template
+#                 nda_edit(template_path, docx_output, context)
+#                 main_converter(docx_output, pdf_output)
+#
+#             # Preview section
+#             st.subheader("Preview")
+#             st.write(f"**Contract Date:** {st.session_state.contract_data['date']}")
+#             st.write(f"**Client Name:** {st.session_state.contract_data['client_name']}")
+#             st.write(f"**Client Company Name:** {st.session_state.contract_data['client_company_name']}")
+#             st.write(f"**Client Address:** {st.session_state.contract_data['client_company_address']}")
+#             st.write(f"**Contract End Date:** {st.session_state.contract_data['contract_end']}")
+#
+#             # PDF preview (requires pdfplumber)
+#             pdf_view(pdf_output)
+#
+#             file_upload_details = {
+#                 "client_name": st.session_state.contract_data['client_name'],
+#                 "company_name": st.session_state.contract_data['client_company_name'],
+#                 "address": st.session_state.contract_data['client_company_address'],
+#                 "contract_date": st.session_state.contract_data['date'],
+#                 "contract_end_date": st.session_state.contract_data['contract_end'],
+#                 "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+#                 "upload_timestamp": firestore.SERVER_TIMESTAMP,
+#             }
+#
+#             # Download buttons
+#             st.subheader("Download Documents")
+#             col1, col2 = st.columns(2)
+#
+#             with col1:
+#                 # generate_download_link(pdf_output,
+#                 #                        f"{st.session_state.contract_data['client_company_name']} "
+#                 #                        f"Contract.pdf",
+#                 #                        "PDF", "Contract")
+#                 if st.button("✅ Confirm and Upload Contract PDF", key="upload_pdf"):
+#                     # storage_path, public_url = save_generated_file_to_firebase(pdf_output, doc_type="Contract",
+#                     #                                                            bucket=bucket)
+#                     save_generated_file_to_firebase_2(
+#                         pdf_output,
+#                         "Contract",
+#                         bucket,
+#                         "PDF",
+#                         file_upload_details
+#                     )
+#
+#                     st.success("Now you can download the file:")
+#                     # Step 2: Show download link only after upload
+#                     generate_download_link(pdf_output,
+#                                            f"{st.session_state.contract_data['client_company_name']} Contract.pdf",
+#                                            "PDF", "Contract")
+#             with col2:
+#
+#                 # Step 1: Confirm and upload
+#                 if st.button("✅ Confirm and Upload Contract DOCX", key="upload_docx"):
+#                     storage_path, public_url = save_generated_file_to_firebase(docx_output, doc_type="Contract",
+#                                                                                bucket=bucket)
+#                     save_generated_file_to_firebase_2(
+#                         docx_output,
+#                         "Contract",
+#                         bucket,
+#                         "DOCX",
+#                         file_upload_details
+#                     )
+#
+#                     st.success("Now you can download the file:")
+#                     # Step 2: Show download link only after upload
+#                     generate_download_link(docx_output,
+#                                            f"{st.session_state.contract_data['client_company_name']} Contract.docx",
+#                                            "DOCX", "Contract")
+#
+#
+#         # Clean up temp files
+#         try:
+#             import os
+#             os.unlink(template_path)
+#             os.unlink(pdf_output)
+#             os.unlink(docx_output)
+#         except Exception as e:
+#             st.warning(f"Error cleaning up temporary files: {str(e)}")
 
 
 def fetch_proposal_templates_to_temp_dir(firestore_db, bucket):
@@ -1467,7 +1815,7 @@ def fetch_proposal_templates_to_temp_dir(firestore_db, bucket):
         folder_paths[section_key] = target_dir
 
         try:
-            templates_ref = firestore_db.collection("hvt_generator").document("Proposal").collection(section_key)
+            templates_ref = firestore_db.collection("AS_DOC_Gen").document("Proposal").collection(section_key)
             templates = templates_ref.stream()
 
             for doc in templates:
@@ -1527,7 +1875,7 @@ def fetch_path_from_temp_dir(sub_folder, selected_template, folder_paths):
 
 def get_proposal_template_details(firestore_db):
     doc_type = "Proposal"
-    proposal_doc_ref = firestore_db.collection("hvt_generator").document(doc_type)
+    proposal_doc_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
 
     # Subcollections map
     section_keys = [
