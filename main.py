@@ -162,7 +162,9 @@ if selected_option == "Admin Panel":
                         help="Public templates can be accessed by all users"
                     )
 
-                    description = st.text_area("Template Description")
+                    description = st.text_area("Template Description",
+                                               placeholder="Name of Template and Keyword(e.g "
+                                                           "Internship Certificate Template Male)")
 
                     # Additional fields for Proposal
                     if doc_type == "Proposal":
