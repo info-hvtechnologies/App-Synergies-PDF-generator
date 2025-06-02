@@ -25,12 +25,12 @@ def internship_edit(input_path, output_path, context):
 #                 "date": "22/3/1290",
 #                 "start_date": "22/3/1290",
 #                 "end_date": "22/6/1290",
-#                 "name": "Diddy",
+#                 "intern_name": "Diddy",
 #                 "amount": "6000",
 #                 "amount_in_words": "Six thousand rupees only",
 #                 "valid_date": "22/3/1290",
 #                 "designation": "General Manager",
 #                 "m": "9",
 #             }
-# internship_edit("app_off_1.docx", "wowo_2.docx", replacements_docx)
+# internship_edit("app_cert_female_1.docx", "wowo_1.docx", replacements_docx)
 

@@ -297,7 +297,7 @@ def handle_internship_certificate():
                 default_index = 0
 
             position = st.selectbox("Internship Position", data_, index=default_index if data_ else 0)
-
+            sex = st.selectbox("Select your sex:", ["Male", "Female", "Other", "Prefer not to say"])
             default_start_date = default_start_date = datetime.strptime(metadata.get("start_date", datetime.now().strftime('%d/%m/%Y')), '%d/%m/%Y').date()
             start_date = st.date_input("Start Date", value=default_start_date)
             duration_str = metadata.get("duration", "3")
@@ -315,6 +315,7 @@ def handle_internship_certificate():
                 st.session_state.offer_data = {
                     "name": name.strip(),
                     "position": position,
+                    "sex": sex,
                     "date": datetime.now().date().strftime('%d/%m/%Y'),
                     "start_date": start_date.strftime('%d/%m/%Y'),
                     "duration": duration,
@@ -334,13 +335,7 @@ def handle_internship_certificate():
                 "intern_name": st.session_state.offer_data["name"],
                 "designation": st.session_state.offer_data["position"],
                 "m": st.session_state.offer_data["duration"],
-                # "date": st.session_state.offer_data["start_date"].strftime("%B %d, %Y"),
-                # "name": st.session_state.offer_data["name"],
-                # "position": st.session_state.offer_data["position"],
-                # "stipend": str(st.session_state.offer_data["stipend"]),
-                # "hours": str(st.session_state.offer_data["hours"]),
-                # "internship_duration": str(st.session_state.offer_data["duration"]),
-                # "first_paycheque_date": st.session_state.offer_data["first_paycheck"].strftime("%B %d, %Y"),
+
             }
 
             template_path = None
@@ -361,18 +356,48 @@ def handle_internship_certificate():
                 template_doc = None
                 for t in templates:
                     t_data = t.to_dict()
-                    if (
-                            t_data.get("visibility") == "Public" and
-                            t_data.get(
-                                "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
-                            t_data.get("storage_path")
-                    ):
-                        blob = bucket.blob(t_data["storage_path"])
-                        if blob.exists():
-                            template_doc = t
-                            break
-                        else:
-                            print(f"❌ Skipping missing file: {t_data['storage_path']}")
+                    # "Male", "Female", "Other", "Prefer not to say"
+                    if st.session_state.offer_data["sex"] == "Male":
+                        if (
+                                "male" in t_data.get("description").lower() and t_data.get("visibility") == "Public" and
+                                t_data.get(
+                                    "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
+                                t_data.get("storage_path")
+                        ):
+                            blob = bucket.blob(t_data["storage_path"])
+                            if blob.exists():
+                                template_doc = t
+                                break
+                            else:
+                                print(f"❌ Skipping missing file: {t_data['storage_path']}")
+
+                    elif st.session_state.offer_data["sex"] == "Female":
+                        if (
+                                "female" in t_data.get("description").lower() and t_data.get("visibility") == "Public" and
+                                t_data.get(
+                                    "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
+                                t_data.get("storage_path")
+                        ):
+                            blob = bucket.blob(t_data["storage_path"])
+                            if blob.exists():
+                                template_doc = t
+                                break
+                            else:
+                                print(f"❌ Skipping missing file: {t_data['storage_path']}")
+
+                    else:
+                        if (
+                                "other" in t_data.get("description").lower() and t_data.get("visibility") == "Public" and
+                                t_data.get(
+                                    "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
+                                t_data.get("storage_path")
+                        ):
+                            blob = bucket.blob(t_data["storage_path"])
+                            if blob.exists():
+                                template_doc = t
+                                break
+                            else:
+                                print(f"❌ Skipping missing file: {t_data['storage_path']}")
 
                 if not template_doc:
                     st.error("No valid public templates found in storage")
@@ -1918,12 +1943,6 @@ def handle_proposal():
     regenerate_data = st.session_state.get('regenerate_data', {})
     is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Proposal"
     metadata = regenerate_data.get('metadata', {})
-    # "client_name": st.session_state.proposal_data['client_name'],
-    # "company_name": st.session_state.proposal_data['company_name'],
-    # "email": st.session_state.proposal_data['email'],
-    # "phone": st.session_state.proposal_data['phone'],
-    # "country": st.session_state.proposal_data['country'],
-    # "proposal_date": st.session_state.proposal_data['proposal_date'],
 
     default_date = datetime.strptime(
         metadata.get("date", datetime.now().strftime('%d-%m-%Y')), '%d-%m-%Y').date()
@@ -1978,14 +1997,6 @@ def handle_proposal():
                     st.error("Proposal data not available")
                 else:
 
-                    # st.session_state.proposal_data = {
-                    #     "client_name": name,
-                    #     "company_name": company,
-                    #     "email": email,
-                    #     "phone": phone,
-                    #     "country": country,
-                    #     "proposal_date": proposal_date.strftime("%B %d, %Y")
-                    # }
                     st.session_state.proposal_form_step = 2
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
@@ -2005,16 +2016,29 @@ def handle_proposal():
             st.error("No valid cover templates available. Cannot proceed.")
             st.stop()
 
+
+
         col1, col2 = st.columns([1, 2])
 
         with col1:
+            with st.container():
+                st.markdown('<div class="custom-select-container">', unsafe_allow_html=True)
 
-            selected_cover_name = st.selectbox(
-                "Choose a cover page style:",
-                options=list(cover_options.keys()),
-                index=0,
-                key="cover_template_select"
-            )
+                selected_cover_name = st.selectbox(
+                    "Choose a cover page style:",
+                    options=list(cover_options.keys()),
+                    index=0,
+                    key="cover_template_select"
+                )
+
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            # selected_cover_name = st.selectbox(
+            #     "Choose a cover page style:",
+            #     options=list(cover_options.keys()),
+            #     index=0,
+            #     key="cover_template_select"
+            # )
 
             selected_template = cover_options[selected_cover_name]
             template_path = fetch_path_from_temp_dir("cover_page", selected_template, folder_paths)
