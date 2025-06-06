@@ -308,7 +308,7 @@ def handle_internship_certificate():
                 default_index = 0
 
             position = st.selectbox("Internship Position", data_, index=default_index if data_ else 0)
-            sex = st.selectbox("Select Intern Sex:", ["Male", "Female", "Other", "Prefer not to say"])
+            # sex = st.selectbox("Select Intern Sex:", ["Male", "Female", "Other", "Prefer not to say"])
             default_start_date = default_start_date = datetime.strptime(metadata.get("start_date", datetime.now().strftime('%d/%m/%Y')), '%d/%m/%Y').date()
             start_date = st.date_input("Start Date", value=default_start_date)
             duration_str = metadata.get("duration", "3")
@@ -326,7 +326,7 @@ def handle_internship_certificate():
                 st.session_state.offer_data = {
                     "name": name.strip(),
                     "position": position,
-                    "sex": sex,
+                    # "sex": sex,
                     "date": datetime.now().date().strftime('%d/%m/%Y'),
                     "start_date": start_date.strftime('%d/%m/%Y'),
                     "duration": duration,
