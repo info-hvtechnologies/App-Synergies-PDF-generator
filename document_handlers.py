@@ -36,72 +36,6 @@ def format_currency_amount(raw_price: str) -> str:
     return f"{number:,.2f}" if '.' in match.group() else f"{int(number):,}"
 
 
-# def generate_download_link(file_path, filename):
-#     with open(file_path, "rb") as f:
-#         file_bytes = f.read()
-#         b64 = base64.b64encode(file_bytes).decode()
-#         href = f'<a href="data:application/pdf;base64,{b64}" download="{filename}">📥 Download Proposal PDF</a>'
-#         st.markdown(href, unsafe_allow_html=True)
-
-
-# def generate_download_link(file_path, filename, file_type, doc_type):
-#     with open(file_path, "rb") as f:
-#         file_bytes = f.read()
-#         b64 = base64.b64encode(file_bytes).decode()
-#         href = f'''
-#         <a href="data:application/pdf;base64,{b64}" download="{filename}"
-#            style="display: inline-block;
-#                   padding: 12px 24px;
-#                   background: linear-gradient(45deg, #2196F3, #00BCD4);
-#                   color: white;
-#                   text-decoration: none;
-#                   border-radius: 6px;
-#                   font-weight: bold;
-#                   font-family: sans-serif;
-#                   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-#                   transition: all 0.3s ease;
-#                   border: none;
-#                   cursor: pointer;">
-#            📥 Download {doc_type} {file_type}
-#         </a>
-#         '''
-#         st.markdown(href, unsafe_allow_html=True)
-
-#
-# def save_generated_file_to_firebase(local_file_path, doc_type, bucket):
-#     try:
-#         from datetime import datetime
-#         import os
-#
-#         # Get filename from local path
-#         filename = os.path.basename(local_file_path)
-#
-#         # Define storage path
-#         storage_path = f"hvt_generator/generated/{doc_type}/{filename}"
-#
-#         # Upload to Firebase Storage
-#         blob = bucket.blob(storage_path)
-#         blob.upload_from_filename(local_file_path)
-#
-#         # Make it public or generate signed URL
-#         public_url = blob.public_url
-#
-#         st.success(f"✅ File uploaded to Firebase")
-#         # st.markdown(f"[📁 View File]({public_url})")
-#
-#         return storage_path, public_url
-#
-#     except Exception as e:
-#         st.error(f"❌ Failed to upload file: {e}")
-#         return None, None
-
-
-# from datetime import datetime
-# import os
-# import streamlit as st
-# from firebase_admin import firestore
-
-
 def save_generated_file_to_firebase_2(
         local_file_path,
         doc_type,
@@ -256,6 +190,91 @@ def fetch_and_organize_templates(firestore_db, base_temp_dir=None):
     return base_temp_dir
 
 
+import json
+
+
+# def truncate_value(value, max_length=80):
+#     from datetime import datetime
+#     import collections
+#
+#     # Recursively handle dictionaries and lists
+#     if isinstance(value, dict):
+#         return {k: truncate_value(v, max_length) for k, v in value.items()}
+#     if isinstance(value, list):
+#         return [truncate_value(v, max_length) for v in value]
+#
+#     # Handle Firestore timestamp and datetime objects
+#     if isinstance(value, datetime):
+#         return value.isoformat()
+#     if hasattr(value, 'isoformat'):
+#         return value.isoformat()
+#
+#     # Truncate long strings
+#     if isinstance(value, str) and len(value) > max_length:
+#         return value[:max_length] + "..."
+#
+#     return value
+
+
+# def truncate_value(value, max_length=80):
+#     # Convert datetime-like values to string
+#     if isinstance(value, datetime):
+#         return value.isoformat()
+#     # Firestore timestamps use a custom class
+#     if hasattr(value, 'isoformat'):
+#         return value.isoformat()
+#     # Truncate long strings
+#     if isinstance(value, str) and len(value) > max_length:
+#         return value[:max_length] + "..."
+#     return value
+
+
+def truncate_value(value, max_length=80):
+    from datetime import datetime
+
+    # Recursively handle dictionaries and lists
+    if isinstance(value, dict):
+        return {k: truncate_value(v, max_length) for k, v in value.items()}
+    if isinstance(value, list):
+        return [truncate_value(v, max_length) for v in value]
+
+    # Handle datetime-like values
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if hasattr(value, 'isoformat'):
+        return value.isoformat()
+
+    # Truncate long strings
+    if isinstance(value, str) and len(value) > max_length:
+        return value[:max_length] + "..."
+
+    return value
+
+
+def dict_to_colored_html(d, indent=0):
+    html = ""
+    space = "&nbsp;" * 4 * indent
+
+    for key, value in d.items():
+        key_html = f'<span style="color:#00BFFF;">"{key}"</span>'  # sky blue keys
+
+        if isinstance(value, dict):
+            html += f"{space}{key_html}: {{<br>{dict_to_colored_html(value, indent + 1)}{space}}},<br>"
+        elif isinstance(value, list):
+            list_html = ", ".join(
+                f'<span style="color:#90EE90;">"{truncate_value(v)}"</span>' if isinstance(v, str)
+                else f'<span style="color:#FFD700;">{truncate_value(v)}</span>'
+                for v in value
+            )
+            html += f"{space}{key_html}: [ {list_html} ],<br>"
+        else:
+            val_color = "#90EE90" if isinstance(value, str) else "#FFD700"  # lightgreen for str, gold for other
+            val_display = f'"{value}"' if isinstance(value, str) else value
+            html += f'{space}{key_html}: <span style="color:{val_color};">{val_display}</span>,<br>'
+    return html
+
+
+
 def handle_internship_certificate():
     st.title("📄 Internship Certificate Form")
     regenerate_data = st.session_state.get('regenerate_data', {})
@@ -271,15 +290,7 @@ def handle_internship_certificate():
     if st.session_state.form_step == 1:
         with st.form("internship_offer_form"):
             name = st.text_input("Intern Name", value=metadata.get('intern', ''), placeholder="John Doe")
-            # json_path = "roles.json"
-            # try:
-            #     with open(json_path, "r") as f:
-            #         data = json.load(f)
-            #         data_ = data.get("internship_position", [])
-            # except Exception as e:
-            #     st.error(f"Error loading roles from JSON: {str(e)}")
-            # positions = data_
-            # position = st.selectbox("Internship Position", positions, index=0 if positions else None,)
+
             default_position = metadata.get("position", "")
             json_path = "roles.json"
             try:
@@ -324,10 +335,158 @@ def handle_internship_certificate():
                 st.session_state.form_step = 2
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
-    # Step 2: Preview and download
     elif st.session_state.form_step == 2:
+        st.subheader("Select Certificate Template")
+
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'form_step', 1))
+
+        # Create temp directory
+        temp_dir = os.path.join(tempfile.gettempdir(), "as_offer")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        doc_type = "Internship Certificate"
+        template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+        templates = template_ref.collection("templates").order_by("upload_timestamp", direction="DESCENDING").get()
+
+        available_templates = []
+        for t in templates:
+            t_data = t.to_dict()
+            if (
+                    t_data.get("visibility") == "Public" and
+                    t_data.get(
+                        "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
+                    t_data.get("storage_path")
+            ):
+                blob = bucket.blob(t_data["storage_path"])
+                if blob.exists():
+                    available_templates.append({"doc": t, "metadata": t_data})
+                else:
+                    print(f"❌ Skipping missing file: {t_data['storage_path']}")
+
+        if not available_templates:
+            st.error("No valid public templates available.")
+            st.stop()
+
+        # Build selection options using display_name as primary, falling back to original_name
+        certificate_options = {
+            tpl["metadata"].get("display_name") or tpl["metadata"].get("original_name", f"Template {i + 1}"): tpl
+            for i, tpl in enumerate(available_templates)
+        }
+
+        st.markdown("""
+            <style>
+                div[data-baseweb="select"] > div {
+                    width: 100% !important;
+                }
+                .custom-select-container {
+                    max-width: 600px;
+                    margin-bottom: 1rem;
+                }
+                .metadata-container {
+                    border: 1px solid #e1e4e8;
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin-top: 16px;
+                    background-color: #f6f8fa;
+                }
+                .metadata-row {
+                    display: flex;
+                    margin-bottom: 8px;
+                }
+                .metadata-label {
+                    font-weight: 600;
+                    min-width: 120px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns([5, 1])
+
+        with col1:
+            selected_name = st.selectbox(
+                "Choose a certificate style:",
+                options=list(certificate_options.keys()),
+                index=0,
+                key="certificate_template_select"
+            )
+
+            selected_template = certificate_options[selected_name]
+            selected_metadata = selected_template["metadata"]
+            selected_storage_path = selected_metadata["storage_path"]
+
+            # Download the selected template
+            template_path = os.path.join(temp_dir, "selected_template.docx")
+            blob = bucket.blob(selected_storage_path)
+            blob.download_to_filename(template_path)
+
+            # Store for later use
+            st.session_state.selected_certificate_template_path = template_path
+
+            # Enhanced metadata display
+            with st.expander("📄 Template Details", expanded=True):
+                tab1, tab2 = st.tabs(["Overview", "Full Metadata"])
+
+                with tab1:
+                    st.markdown(f"**Display Name:** `{selected_metadata.get('display_name', 'Not specified')}`")
+                    st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
+                    st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
+                    st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+
+                with tab2:
+                    from streamlit.components.v1 import html as st_html
+
+                    pretty_metadata = {
+                        k: truncate_value(v) for k, v in selected_metadata.items()
+                        if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    }
+
+                    html_output = "<div style='font-family: monospace; font-size: 14px;'>{</br>" + dict_to_colored_html(
+                        pretty_metadata) + "}</div>"
+
+                    st_html(html_output, height=400, scrolling=True)
+
+
+                    # pretty_metadata = {
+                    #     k: truncate_value(v) for k, v in selected_metadata.items()
+                    #     if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    # }
+                    #
+                    # st.text_area("Metadata", json.dumps(pretty_metadata, indent=2), height=300)
+
+
+
+                    # st.code(json.dumps(display_metadata, indent=2), language="json")
+
+                    # display_metadata = {
+                    #     k: v for k, v in selected_metadata.items()
+                    #     if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    # }
+                    # st.json(display_metadata)
+
+
+            # Show PDF preview if available
+            if selected_metadata.get('has_pdf_preview', False):
+                # if st.button("👁️ Show Preview"):
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                        pdf_blob = bucket.blob(selected_metadata['pdf_storage_path'])
+                        pdf_blob.download_to_filename(tmp_file.name)
+                        # pdf_view()
+                        pdf_view(tmp_file.name)
+                except Exception as e:
+                    st.error(f"Failed to load preview: {str(e)}")
+            else:
+                st.write(f"Preview file unavailable.")
+
+        if st.button("Generate Certificate Document"):
+            st.session_state.form_step = 3
+            st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+
+    # Step 3: Preview and download
+    elif st.session_state.form_step == 3:
         with st.spinner("Loading template and generating certificate..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'form_step', 1))
+            st.button("← Back to Template select", on_click=lambda: setattr(st.session_state, 'form_step', 2))
             context = {
                 "date": st.session_state.offer_data["date"],
                 "start_date": st.session_state.offer_data["start_date"],
@@ -338,188 +497,102 @@ def handle_internship_certificate():
 
             }
 
-            template_path = None
-            docx_output = None
-            pdf_output = None
 
-            try:
-                # Create temp directory
-                temp_dir = os.path.join(tempfile.gettempdir(), "as_offer")
-                os.makedirs(temp_dir, exist_ok=True)
+            temp_dir = os.path.join(tempfile.gettempdir(), "as_offer")
+            os.makedirs(temp_dir, exist_ok=True)
 
-                # Fetch the template with order_number == 1
-                doc_type = "Internship Certificate"
-                template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
-                # Get all templates ordered by order_number
-                templates = template_ref.collection("templates").order_by("order_number").get()
+            template_path = st.session_state.selected_certificate_template_path
+            # blob.download_to_filename(template_path)
 
-                template_doc = None
-                for t in templates:
-                    t_data = t.to_dict()
-                    # "Male", "Female", "Other", "Prefer not to say"
-                    if st.session_state.offer_data["sex"] == "Male":
-                        if (
-                                "male" in t_data.get("description").lower() and t_data.get("visibility") == "Public" and
-                                t_data.get(
-                                    "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
-                                t_data.get("storage_path")
-                        ):
-                            blob = bucket.blob(t_data["storage_path"])
-                            if blob.exists():
-                                template_doc = t
-                                break
-                            else:
-                                print(f"❌ Skipping missing file: {t_data['storage_path']}")
+            docx_output = os.path.join(temp_dir, "cert.docx")
+            pdf_output = os.path.join(temp_dir, "cert.pdf")
 
-                    elif st.session_state.offer_data["sex"] == "Female":
-                        if (
-                                "female" in t_data.get("description").lower() and t_data.get("visibility") == "Public" and
-                                t_data.get(
-                                    "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
-                                t_data.get("storage_path")
-                        ):
-                            blob = bucket.blob(t_data["storage_path"])
-                            if blob.exists():
-                                template_doc = t
-                                break
-                            else:
-                                print(f"❌ Skipping missing file: {t_data['storage_path']}")
+            from inter_edit import internship_edit
+            internship_edit(template_path, docx_output, context)
+            main_converter(docx_output, pdf_output)
 
-                    else:
-                        if (
-                                "other" in t_data.get("description").lower() and t_data.get("visibility") == "Public" and
-                                t_data.get(
-                                    "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
-                                t_data.get("storage_path")
-                        ):
-                            blob = bucket.blob(t_data["storage_path"])
-                            if blob.exists():
-                                template_doc = t
-                                break
-                            else:
-                                print(f"❌ Skipping missing file: {t_data['storage_path']}")
+            # Preview section
+            st.subheader("Preview Certificate")
+            col1, col2 = st.columns(2)
 
-                if not template_doc:
-                    st.error("No valid public templates found in storage")
-                    return
-
-                template_data = template_doc.to_dict()
-
-                if template_data.get("visibility") != "Public":
-                    st.error("This template is not publicly available")
-                    return
-
-                if template_data.get(
-                        "file_type") != "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                    st.error("Template must be a Word document (.docx)")
-                    return
-
-                storage_path = template_data.get("storage_path")
-                if not storage_path:
-                    st.error("Missing storage path in template metadata")
-                    return
-
-                blob = bucket.blob(storage_path)
-                if not blob.exists():
-                    # st.warning(f"❌ Skipping missing file: {storage_path}")
-                    return
-
-                template_path = os.path.join(temp_dir, "template.docx")
-                blob.download_to_filename(template_path)
-
-                docx_output = os.path.join(temp_dir, "cert.docx")
-                pdf_output = os.path.join(temp_dir, "cert.pdf")
-
-                from inter_edit import internship_edit
-                internship_edit(template_path, docx_output, context)
-                main_converter(docx_output, pdf_output)
-
-                # Preview section
-                st.subheader("Preview")
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.write(f"**Start Date:** {context['date']}")
-                    st.write(f"**Intern Name:** {context['intern_name']}")
-                    st.write(f"**Position:** {context['designation']}")
+            with col1:
+                st.write(f"**Start Date:** {context['date']}")
+                st.write(f"**Intern Name:** {context['intern_name']}")
+                st.write(f"**Position:** {context['designation']}")
 
 
-                with col2:
-                    st.write(f"**Duration:** {st.session_state.offer_data['duration']} months")
-                    st.write(f"**End Date:** {context['end_date']}")
-                    # st.write(f"**First Paycheck:** {context['first_paycheque_date']}")
+            with col2:
+                st.write(f"**Duration:** {st.session_state.offer_data['duration']} months")
+                st.write(f"**End Date:** {context['end_date']}")
+                # st.write(f"**First Paycheck:** {context['first_paycheque_date']}")
 
-                pdf_view(pdf_output)
+            pdf_view(pdf_output)
 
-                st.subheader("Download Documents")
-                col1, col2 = st.columns(2)
-                file_prefix = f"{context['intern_name'].replace(' ', ' ')} {context['designation'].replace(' ', ' ')}"
-                file_upload_details = {
-                    "intern": context['intern_name'],
-                    "position": context['designation'],
-                    "start_date": context['start_date'],
-                    "duration": f"{st.session_state.offer_data['duration']} months",
-                    "end_date": context['end_date'],
-                    "date": context['date'],
-                    # "first_pay_cheque_date": context['first_paycheque_date'],
-                    "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "upload_timestamp": firestore.SERVER_TIMESTAMP,
-                }
+            st.subheader("Download Documents")
+            col1, col2 = st.columns(2)
+            file_prefix = f"{context['intern_name'].replace(' ', ' ')} {context['designation'].replace(' ', ' ')}"
+            file_upload_details = {
+                "intern": context['intern_name'],
+                "position": context['designation'],
+                "start_date": context['start_date'],
+                "duration": f"{st.session_state.offer_data['duration']} months",
+                "end_date": context['end_date'],
+                "date": context['date'],
+                # "first_pay_cheque_date": context['first_paycheque_date'],
+                "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "upload_timestamp": firestore.SERVER_TIMESTAMP,
+            }
 
-                with col1:
-                    if os.path.exists(pdf_output):
+            with col1:
+                if os.path.exists(pdf_output):
 
-                        if st.button("✅ Confirm and Upload Internship Certificate PDF", key="upload_pdf"):
+                    if st.button("✅ Confirm and Upload Internship Certificate PDF", key="upload_pdf"):
 
-                            save_generated_file_to_firebase_2(
-                                pdf_output,
-                                "Internship",
-                                bucket,
-                                "PDF",
-                                file_upload_details
-                            )
+                        save_generated_file_to_firebase_2(
+                            pdf_output,
+                            "Internship",
+                            bucket,
+                            "PDF",
+                            file_upload_details
+                        )
 
-                            st.success("Now you can download the file:")
-                            # Step 2: Show download link only after upload
-                            generate_download_link(pdf_output,
-                                                   f"{file_prefix} Internship Certificate.pdf",
-                                                   "PDF", "Internship")
+                        st.success("Now you can download the file:")
+                        # Step 2: Show download link only after upload
+                        generate_download_link(pdf_output,
+                                               f"{file_prefix} Internship Certificate.pdf",
+                                               "PDF", "Internship")
 
-                    else:
-                        st.warning("PDF file not available")
+                else:
+                    st.warning("PDF file not available")
 
-                with col2:
-                    if os.path.exists(docx_output):
+            with col2:
+                if os.path.exists(docx_output):
 
-                        if st.button("✅ Confirm and Upload Internship Certificate DOCX", key="upload_docx"):
+                    if st.button("✅ Confirm and Upload Internship Certificate DOCX", key="upload_docx"):
 
-                            save_generated_file_to_firebase_2(
-                                docx_output,
-                                "Internship",
-                                bucket,
-                                "DOCX",
-                                file_upload_details
-                            )
-                            st.success("Now you can download the file:")
-                            # Step 2: Show download link only after upload
-                            generate_download_link(docx_output,
-                                                   f"{file_prefix} Internship Certificate.docx",
-                                                   "DOCX", "Internship")
+                        save_generated_file_to_firebase_2(
+                            docx_output,
+                            "Internship",
+                            bucket,
+                            "DOCX",
+                            file_upload_details
+                        )
+                        st.success("Now you can download the file:")
+                        # Step 2: Show download link only after upload
+                        generate_download_link(docx_output,
+                                               f"{file_prefix} Internship Certificate.docx",
+                                               "DOCX", "Internship")
 
-                    else:
-                        st.warning("DOCX file not available")
+                else:
+                    st.warning("DOCX file not available")
 
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-                st.error("Please try again or contact support if the problem persists.")
 
-            finally:
-                try:
-                    for file_path in [template_path, docx_output, pdf_output]:
-                        if file_path and os.path.exists(file_path):
-                            os.unlink(file_path)
-                except Exception as e:
-                    st.warning(f"Could not clean up temporary files: {str(e)}")
+    # try:
+    #     for file_path in [template_path, docx_output, pdf_output]:
+    #         if file_path and os.path.exists(file_path):
+    #             os.unlink(file_path)
+    # except Exception as e:
+    #     st.warning(f"Could not clean up temporary files: {str(e)}")
 
 
 def handle_internship_offer():
@@ -574,15 +647,6 @@ def handle_internship_offer():
 
             position = st.selectbox("Internship Position", data_, index=default_index if data_ else 0)
 
-            # json_path = "roles.json"
-            # try:
-            #     with open(json_path, "r") as f:
-            #         data = json.load(f)
-            #         data_ = data.get("internship_position", [])
-            # except Exception as e:
-            #     st.error(f"Error loading roles from JSON: {str(e)}")
-            # positions = data_
-            # position = st.selectbox("Internship Designation", positions, index=0 if positions else None)
 
             duration = st.number_input("Internship Duration (In Months)", min_value=1, max_value=24, step=1, value=default_duration)
             start_date = st.date_input("Start Date", value=default_start_date)
@@ -606,10 +670,148 @@ def handle_internship_offer():
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
     elif st.session_state.internship_offer_form_step == 2:
+        st.subheader("Select Offer Template")
+
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'form_step', 1))
+
+        # Create temp directory
+        import os
+        temp_dir = os.path.join(tempfile.gettempdir(), "as__inter_offer")
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_dir = os.path.join(tempfile.gettempdir(), "as__inter_offer")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        doc_type = "Internship Offer"
+        template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+        templates = template_ref.collection("templates").order_by("upload_timestamp", direction="DESCENDING").get()
+
+        available_templates = []
+        for t in templates:
+            t_data = t.to_dict()
+            if (
+                    t_data.get("visibility") == "Public" and
+                    t_data.get(
+                        "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
+                    t_data.get("storage_path")
+            ):
+                blob = bucket.blob(t_data["storage_path"])
+                if blob.exists():
+                    available_templates.append({"doc": t, "metadata": t_data})
+                else:
+                    print(f"❌ Skipping missing file: {t_data['storage_path']}")
+
+        if not available_templates:
+            st.error("No valid public templates available.")
+            st.stop()
+
+        # Build selection options using display_name as primary, falling back to original_name
+        certificate_options = {
+            tpl["metadata"].get("display_name") or tpl["metadata"].get("original_name", f"Template {i + 1}"): tpl
+            for i, tpl in enumerate(available_templates)
+        }
+
+        st.markdown("""
+            <style>
+                div[data-baseweb="select"] > div {
+                    width: 100% !important;
+                }
+                .custom-select-container {
+                    max-width: 600px;
+                    margin-bottom: 1rem;
+                }
+                .metadata-container {
+                    border: 1px solid #e1e4e8;
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin-top: 16px;
+                    background-color: #f6f8fa;
+                }
+                .metadata-row {
+                    display: flex;
+                    margin-bottom: 8px;
+                }
+                .metadata-label {
+                    font-weight: 600;
+                    min-width: 120px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns([5, 1])
+
+        with col1:
+            selected_name = st.selectbox(
+                "Choose a offer style:",
+                options=list(certificate_options.keys()),
+                index=0,
+                key="certificate_template_select"
+            )
+
+            selected_template = certificate_options[selected_name]
+            selected_metadata = selected_template["metadata"]
+            selected_storage_path = selected_metadata["storage_path"]
+
+            # Download the selected template
+            template_path = os.path.join(temp_dir, "selected_template.docx")
+            blob = bucket.blob(selected_storage_path)
+            blob.download_to_filename(template_path)
+
+            # Store for later use
+            st.session_state.selected_offer_template_path = template_path
+
+            # Enhanced metadata display
+            with st.expander("📄 Template Details", expanded=True):
+                tab1, tab2 = st.tabs(["Overview", "Full Metadata"])
+
+                with tab1:
+                    st.markdown(f"**Display Name:** `{selected_metadata.get('display_name', 'Not specified')}`")
+                    st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
+                    st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
+                    st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+
+                with tab2:
+                    from streamlit.components.v1 import html as st_html
+
+                    pretty_metadata = {
+                        k: truncate_value(v) for k, v in selected_metadata.items()
+                        if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    }
+
+                    html_output = "<div style='font-family: monospace; font-size: 14px;'>{</br>" + dict_to_colored_html(
+                        pretty_metadata) + "}</div>"
+
+                    st_html(html_output, height=400, scrolling=True)
+
+                    # display_metadata = {
+                    #     k: v for k, v in selected_metadata.items()
+                    #     if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    # }
+                    # st.json(display_metadata)
+
+            # Show PDF preview if available
+            if selected_metadata.get('has_pdf_preview', False):
+                # if st.button("👁️ Show Preview"):
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                        pdf_blob = bucket.blob(selected_metadata['pdf_storage_path'])
+                        pdf_blob.download_to_filename(tmp_file.name)
+                        # pdf_view()
+                        pdf_view(tmp_file.name)
+                except Exception as e:
+                    st.error(f"Failed to load preview: {str(e)}")
+            else:
+                st.write(f"Preview file unavailable.")
+
+        if st.button("Generate Offer Document"):
+            st.session_state.internship_offer_form_step = 3
+            st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+
+    elif st.session_state.internship_offer_form_step == 3:
         # Step 2: Preview and download
         # st.success("NDA generated successfully!")
-        with st.spinner("Loading template and generating offer..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'internship_offer_form_step', 1))
+        with st.spinner("Generating offer..."):
+            st.button("← Back to Template select ", on_click=lambda: setattr(st.session_state, 'internship_offer_form_step', 2))
 
            # Generate documents
             replacements_docx = {
@@ -628,42 +830,8 @@ def handle_internship_offer():
             # Get template from Firestore
             doc_type = "Internship Offer"  # Changed to match your collection name
             try:
-                template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
-                templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
 
-                if not templates:
-                    st.error("No templates found in the database for Internship Offer")
-                    return
-
-                # Get the first template (order_number = 1)
-
-                template_doc = templates[0]
-                template_data = template_doc.to_dict()
-
-                # Visibility check
-                if template_data.get('visibility', 'Private') != 'Public':
-                    st.error("This Offer template is not currently available")
-                    return
-
-                # File type check
-                if template_data.get(
-                        'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                    st.error("Template is not a valid Word document (.docx)")
-                    return
-
-                # Check if storage_path exists
-                if 'storage_path' not in template_data:
-                    st.error("Template storage path not found in the database")
-                    return
-
-                # Download the template file from Firebase Storage
-                # bucket = storage.bucket()
-                blob = bucket.blob(template_data['storage_path'])
-
-                # Create a temporary file for the template
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
-                    blob.download_to_filename(temp_template.name)
-                    template_path = temp_template.name
+                    template_path = st.session_state.selected_offer_template_path
 
             except Exception as e:
                 st.error(f"Error fetching template: {str(e)}")
@@ -750,13 +918,13 @@ def handle_internship_offer():
                                            "DOCX", "Offer")
 
         # Clean up temp files
-        try:
-            import os
-            os.unlink(template_path)
-            os.unlink(pdf_output)
-            os.unlink(docx_output)
-        except:
-            pass
+        # try:
+        #     import os
+        #     os.unlink(template_path)
+        #     os.unlink(pdf_output)
+        #     os.unlink(docx_output)
+        # except:
+        #     pass
 
 
 def handle_relieving_letter():
@@ -831,9 +999,147 @@ def handle_relieving_letter():
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
     elif st.session_state.relieving_letter_form_step == 2:
+        st.subheader("Select Letter Template")
+
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'form_step', 1))
+
+        # Create temp directory
+        import os
+        temp_dir = os.path.join(tempfile.gettempdir(), "as_letter")
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_dir = os.path.join(tempfile.gettempdir(), "as_letter")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        doc_type = "Relieving Letter"
+        template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+        templates = template_ref.collection("templates").order_by("upload_timestamp", direction="DESCENDING").get()
+
+        available_templates = []
+        for t in templates:
+            t_data = t.to_dict()
+            if (
+                    t_data.get("visibility") == "Public" and
+                    t_data.get(
+                        "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
+                    t_data.get("storage_path")
+            ):
+                blob = bucket.blob(t_data["storage_path"])
+                if blob.exists():
+                    available_templates.append({"doc": t, "metadata": t_data})
+                else:
+                    print(f"❌ Skipping missing file: {t_data['storage_path']}")
+
+        if not available_templates:
+            st.error("No valid public templates available.")
+            st.stop()
+
+        # Build selection options using display_name as primary, falling back to original_name
+        certificate_options = {
+            tpl["metadata"].get("display_name") or tpl["metadata"].get("original_name", f"Template {i + 1}"): tpl
+            for i, tpl in enumerate(available_templates)
+        }
+
+        st.markdown("""
+            <style>
+                div[data-baseweb="select"] > div {
+                    width: 100% !important;
+                }
+                .custom-select-container {
+                    max-width: 600px;
+                    margin-bottom: 1rem;
+                }
+                .metadata-container {
+                    border: 1px solid #e1e4e8;
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin-top: 16px;
+                    background-color: #f6f8fa;
+                }
+                .metadata-row {
+                    display: flex;
+                    margin-bottom: 8px;
+                }
+                .metadata-label {
+                    font-weight: 600;
+                    min-width: 120px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns([5, 1])
+
+        with col1:
+            selected_name = st.selectbox(
+                "Choose a letter style:",
+                options=list(certificate_options.keys()),
+                index=0,
+                key="certificate_template_select"
+            )
+
+            selected_template = certificate_options[selected_name]
+            selected_metadata = selected_template["metadata"]
+            selected_storage_path = selected_metadata["storage_path"]
+
+            # Download the selected template
+            template_path = os.path.join(temp_dir, "selected_template.docx")
+            blob = bucket.blob(selected_storage_path)
+            blob.download_to_filename(template_path)
+
+            # Store for later use
+            st.session_state.selected_letter_template_path = template_path
+
+            # Enhanced metadata display
+            with st.expander("📄 Template Details", expanded=True):
+                tab1, tab2 = st.tabs(["Overview", "Full Metadata"])
+
+                with tab1:
+                    st.markdown(f"**Display Name:** `{selected_metadata.get('display_name', 'Not specified')}`")
+                    st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
+                    st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
+                    st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+
+                with tab2:
+                    from streamlit.components.v1 import html as st_html
+
+                    pretty_metadata = {
+                        k: truncate_value(v) for k, v in selected_metadata.items()
+                        if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    }
+
+                    html_output = "<div style='font-family: monospace; font-size: 14px;'>{</br>" + dict_to_colored_html(
+                        pretty_metadata) + "}</div>"
+
+                    st_html(html_output, height=400, scrolling=True)
+
+                    # display_metadata = {
+                    #     k: v for k, v in selected_metadata.items()
+                    #     if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    # }
+                    # st.json(display_metadata)
+
+            # Show PDF preview if available
+            if selected_metadata.get('has_pdf_preview', False):
+                # if st.button("👁️ Show Preview"):
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                        pdf_blob = bucket.blob(selected_metadata['pdf_storage_path'])
+                        pdf_blob.download_to_filename(tmp_file.name)
+                        # pdf_view()
+                        pdf_view(tmp_file.name)
+                except Exception as e:
+                    st.error(f"Failed to load preview: {str(e)}")
+            else:
+                st.write(f"Preview file unavailable.")
+
+        if st.button("Generate Letter Documents"):
+            st.session_state.relieving_letter_form_step = 3
+            st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    elif st.session_state.relieving_letter_form_step == 3:
+        # st.session_state.selected_letter_template_path
         # Step 2: Preview and download
         with st.spinner("Loading template and generating letter..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'relieving_letter_form_step', 1))
+            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'relieving_letter_form_step', 2))
 
             # Generate documents
             replacements_docx = {
@@ -849,42 +1155,43 @@ def handle_relieving_letter():
             # Get template from Firestore
             doc_type = "Relieving Letter"  # Changed to match your collection name
             try:
-                template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
-                templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
+                # template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+                # templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
+                #
+                # if not templates:
+                #     st.error("No templates found in the database for Internship Offer")
+                #     return
+                #
+                # # Get the first template (order_number = 1)
+                #
+                # template_doc = templates[0]
+                # template_data = template_doc.to_dict()
+                #
+                # # Visibility check
+                # if template_data.get('visibility', 'Private') != 'Public':
+                #     st.error("This Relieving Letter template is not currently available")
+                #     return
+                #
+                # # File type check
+                # if template_data.get(
+                #         'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                #     st.error("Template is not a valid Word document (.docx)")
+                #     return
+                #
+                # # Check if storage_path exists
+                # if 'storage_path' not in template_data:
+                #     st.error("Template storage path not found in the database")
+                #     return
+                #
+                # # Download the template file from Firebase Storage
+                # # bucket = storage.bucket()
+                # blob = bucket.blob(template_data['storage_path'])
+                #
+                # # Create a temporary file for the template
+                # with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
+                #     blob.download_to_filename(temp_template.name)
 
-                if not templates:
-                    st.error("No templates found in the database for Internship Offer")
-                    return
-
-                # Get the first template (order_number = 1)
-
-                template_doc = templates[0]
-                template_data = template_doc.to_dict()
-
-                # Visibility check
-                if template_data.get('visibility', 'Private') != 'Public':
-                    st.error("This Relieving Letter template is not currently available")
-                    return
-
-                # File type check
-                if template_data.get(
-                        'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                    st.error("Template is not a valid Word document (.docx)")
-                    return
-
-                # Check if storage_path exists
-                if 'storage_path' not in template_data:
-                    st.error("Template storage path not found in the database")
-                    return
-
-                # Download the template file from Firebase Storage
-                # bucket = storage.bucket()
-                blob = bucket.blob(template_data['storage_path'])
-
-                # Create a temporary file for the template
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
-                    blob.download_to_filename(temp_template.name)
-                    template_path = temp_template.name
+                template_path = st.session_state.selected_letter_template_path
 
             except Exception as e:
                 st.error(f"Error fetching template: {str(e)}")
@@ -964,14 +1271,14 @@ def handle_relieving_letter():
                                            f"{st.session_state.relieving_letter_data['intern_name']} {st.session_state.relieving_letter_data['position']} letter.docx",
                                            "DOCX", "Relieving Letter")
 
-        # Clean up temp files
-        try:
-            import os
-            os.unlink(template_path)
-            os.unlink(pdf_output)
-            os.unlink(docx_output)
-        except:
-            pass
+    #     # Clean up temp files
+    #     try:
+    #         import os
+    #         os.unlink(template_path)
+    #         os.unlink(pdf_output)
+    #         os.unlink(docx_output)
+    #     except:
+    #         pass
 
 
 def handle_contract():
@@ -989,15 +1296,6 @@ def handle_contract():
     default_contract_end = datetime.strptime(metadata.get("contract_end", datetime.now().strftime('%d/%m/%Y')),
                                          '%d/%m/%Y').date()
     default_client_address = metadata.get("client_address", "")
-    # duration_str = metadata.get("duration", "")
-    # match = re.search(r"\d+", duration_str)
-    # default_duration = int(match.group()) if match else 3
-
-    # "date": st.session_state.contract_data["date"],
-    # "client_company_name": st.session_state.contract_data["client_company_name"],
-    # "client_name": st.session_state.contract_data['client_name'],
-    # "client_address": st.session_state.contract_data["client_company_address"],
-    # "contract_end": st.session_state.contract_data["contract_end"],
 
     # Initialize session state for multi-page form
     if 'contract_form_step' not in st.session_state:
@@ -1013,7 +1311,7 @@ def handle_contract():
             client_company_address = st.text_area("Client Company Address", value=default_client_address, placeholder="2 Street, NY.")
             contract_end = st.date_input("Contract End Date", default_contract_end)
 
-            if st.form_submit_button("Generate Contract"):
+            if st.form_submit_button("Select Contract Template"):
                 st.session_state.contract_data = {
                     "date": f"{date.day}/{date.month}/{date.year}",
                     "client_company_name": client_company_name,
@@ -1025,10 +1323,148 @@ def handle_contract():
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
     elif st.session_state.contract_form_step == 2:
+        st.subheader("Select Contract Template")
+
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'contract_form_step', 1))
+
+        # Create temp directory
+        import os
+        temp_dir = os.path.join(tempfile.gettempdir(), "as_contract")
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_dir = os.path.join(tempfile.gettempdir(), "as_contract")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        doc_type = "Project Contract"
+        template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+        templates = template_ref.collection("templates").order_by("upload_timestamp", direction="DESCENDING").get()
+
+        available_templates = []
+        for t in templates:
+            t_data = t.to_dict()
+            if (
+                    t_data.get("visibility") == "Public" and
+                    t_data.get(
+                        "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
+                    t_data.get("storage_path")
+            ):
+                blob = bucket.blob(t_data["storage_path"])
+                if blob.exists():
+                    available_templates.append({"doc": t, "metadata": t_data})
+                else:
+                    print(f"❌ Skipping missing file: {t_data['storage_path']}")
+
+        if not available_templates:
+            st.error("No valid public templates available.")
+            st.stop()
+
+        # Build selection options using display_name as primary, falling back to original_name
+        certificate_options = {
+            tpl["metadata"].get("display_name") or tpl["metadata"].get("original_name", f"Template {i + 1}"): tpl
+            for i, tpl in enumerate(available_templates)
+        }
+
+        st.markdown("""
+            <style>
+                div[data-baseweb="select"] > div {
+                    width: 100% !important;
+                }
+                .custom-select-container {
+                    max-width: 600px;
+                    margin-bottom: 1rem;
+                }
+                .metadata-container {
+                    border: 1px solid #e1e4e8;
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin-top: 16px;
+                    background-color: #f6f8fa;
+                }
+                .metadata-row {
+                    display: flex;
+                    margin-bottom: 8px;
+                }
+                .metadata-label {
+                    font-weight: 600;
+                    min-width: 120px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns([5, 1])
+
+        with col1:
+            selected_name = st.selectbox(
+                "Choose a contract style:",
+                options=list(certificate_options.keys()),
+                index=0,
+                key="certificate_template_select"
+            )
+
+            selected_template = certificate_options[selected_name]
+            selected_metadata = selected_template["metadata"]
+            selected_storage_path = selected_metadata["storage_path"]
+
+            # Download the selected template
+            template_path = os.path.join(temp_dir, "selected_template.docx")
+            blob = bucket.blob(selected_storage_path)
+            blob.download_to_filename(template_path)
+
+            # Store for later use
+            st.session_state.selected_contract_template_path = template_path
+
+            # Enhanced metadata display
+            with st.expander("📄 Template Details", expanded=True):
+                tab1, tab2 = st.tabs(["Overview", "Full Metadata"])
+
+                with tab1:
+                    st.markdown(f"**Display Name:** `{selected_metadata.get('display_name', 'Not specified')}`")
+                    st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
+                    st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
+                    st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+
+                with tab2:
+                    from streamlit.components.v1 import html as st_html
+
+                    pretty_metadata = {
+                        k: truncate_value(v) for k, v in selected_metadata.items()
+                        if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    }
+
+                    html_output = "<div style='font-family: monospace; font-size: 14px;'>{</br>" + dict_to_colored_html(
+                        pretty_metadata) + "}</div>"
+
+                    st_html(html_output, height=400, scrolling=True)
+
+                    # display_metadata = {
+                    #     k: v for k, v in selected_metadata.items()
+                    #     if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    # }
+                    # st.json(display_metadata)
+
+            # Show PDF preview if available
+            if selected_metadata.get('has_pdf_preview', False):
+                # if st.button("👁️ Show Preview"):
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                        pdf_blob = bucket.blob(selected_metadata['pdf_storage_path'])
+                        pdf_blob.download_to_filename(tmp_file.name)
+                        # pdf_view()
+                        pdf_view(tmp_file.name)
+                except Exception as e:
+                    st.error(f"Failed to load preview: {str(e)}")
+            else:
+                st.write(f"Preview file unavailable.")
+
+        if st.button("Generate Contract Documents"):
+            st.session_state.contract_form_step = 3
+            st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    elif st.session_state.contract_form_step == 3:
         # Step 2: Preview and download
         # st.success("NDA generated successfully!")
-        with st.spinner("Loading template and generating contract..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'contract_form_step', 1))
+        # st.session_state.selected_contract_template_path
+        with st.spinner("Generating contract..."):
+            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'contract_form_step', 2))
 
            # Generate documents
             replacements_docx = {
@@ -1040,44 +1476,9 @@ def handle_contract():
             }
 
             # Get template from Firestore
-            doc_type = "Contract"  # Changed to match your collection name
+            doc_type = "Project Contract"  # Changed to match your collection name
             try:
-                template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
-                templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
-
-                if not templates:
-                    st.error("No templates found in the database for Internship Offer")
-                    return
-
-                # Get the first template (order_number = 1)
-
-                template_doc = templates[0]
-                template_data = template_doc.to_dict()
-
-                # Visibility check
-                if template_data.get('visibility', 'Private') != 'Public':
-                    st.error("This Offer template is not currently available")
-                    return
-
-                # File type check
-                if template_data.get(
-                        'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                    st.error("Template is not a valid Word document (.docx)")
-                    return
-
-                # Check if storage_path exists
-                if 'storage_path' not in template_data:
-                    st.error("Template storage path not found in the database")
-                    return
-
-                # Download the template file from Firebase Storage
-                # bucket = storage.bucket()
-                blob = bucket.blob(template_data['storage_path'])
-
-                # Create a temporary file for the template
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
-                    blob.download_to_filename(temp_template.name)
-                    template_path = temp_template.name
+                template_path = st.session_state.selected_contract_template_path
 
             except Exception as e:
                 st.error(f"Error fetching template: {str(e)}")
@@ -1157,15 +1558,15 @@ def handle_contract():
                     generate_download_link(docx_output,
                                            f"{st.session_state.contract_data['client_name']} {st.session_state.contract_data['client_company_name']} contract.docx",
                                            "DOCX", "Contract")
-
-        # Clean up temp files
-        try:
-            import os
-            os.unlink(template_path)
-            os.unlink(pdf_output)
-            os.unlink(docx_output)
-        except:
-            pass
+    #
+    #     # Clean up temp files
+    #     try:
+    #         import os
+    #         os.unlink(template_path)
+    #         os.unlink(pdf_output)
+    #         os.unlink(docx_output)
+    #     except:
+    #         pass
 
 
 def handle_nda():
@@ -1205,10 +1606,147 @@ def handle_nda():
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
     elif st.session_state.nda_form_step == 2:
+        st.subheader("Select NDA Template")
+
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'nda_form_step', 1))
+
+        # Create temp directory
+        import os
+        temp_dir = os.path.join(tempfile.gettempdir(), "as_nda")
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_dir = os.path.join(tempfile.gettempdir(), "as_nda")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        doc_type = "Project NDA"
+        template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+        templates = template_ref.collection("templates").order_by("upload_timestamp", direction="DESCENDING").get()
+
+        available_templates = []
+        for t in templates:
+            t_data = t.to_dict()
+            if (
+                    t_data.get("visibility") == "Public" and
+                    t_data.get(
+                        "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
+                    t_data.get("storage_path")
+            ):
+                blob = bucket.blob(t_data["storage_path"])
+                if blob.exists():
+                    available_templates.append({"doc": t, "metadata": t_data})
+                else:
+                    print(f"❌ Skipping missing file: {t_data['storage_path']}")
+
+        if not available_templates:
+            st.error("No valid public templates available.")
+            st.stop()
+
+        # Build selection options using display_name as primary, falling back to original_name
+        certificate_options = {
+            tpl["metadata"].get("display_name") or tpl["metadata"].get("original_name", f"Template {i + 1}"): tpl
+            for i, tpl in enumerate(available_templates)
+        }
+
+        st.markdown("""
+            <style>
+                div[data-baseweb="select"] > div {
+                    width: 100% !important;
+                }
+                .custom-select-container {
+                    max-width: 600px;
+                    margin-bottom: 1rem;
+                }
+                .metadata-container {
+                    border: 1px solid #e1e4e8;
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin-top: 16px;
+                    background-color: #f6f8fa;
+                }
+                .metadata-row {
+                    display: flex;
+                    margin-bottom: 8px;
+                }
+                .metadata-label {
+                    font-weight: 600;
+                    min-width: 120px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns([5, 1])
+
+        with col1:
+            selected_name = st.selectbox(
+                "Choose a nda style:",
+                options=list(certificate_options.keys()),
+                index=0,
+                key="certificate_template_select"
+            )
+
+            selected_template = certificate_options[selected_name]
+            selected_metadata = selected_template["metadata"]
+            selected_storage_path = selected_metadata["storage_path"]
+
+            # Download the selected template
+            template_path = os.path.join(temp_dir, "selected_template.docx")
+            blob = bucket.blob(selected_storage_path)
+            blob.download_to_filename(template_path)
+
+            # Store for later use
+            st.session_state.selected_nda_template_path = template_path
+
+            # Enhanced metadata display
+            with st.expander("📄 Template Details", expanded=True):
+                tab1, tab2 = st.tabs(["Overview", "Full Metadata"])
+
+                with tab1:
+                    st.markdown(f"**Display Name:** `{selected_metadata.get('display_name', 'Not specified')}`")
+                    st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
+                    st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
+                    st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+
+                with tab2:
+                    from streamlit.components.v1 import html as st_html
+
+                    pretty_metadata = {
+                        k: truncate_value(v) for k, v in selected_metadata.items()
+                        if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    }
+
+                    html_output = "<div style='font-family: monospace; font-size: 14px;'>{</br>" + dict_to_colored_html(
+                        pretty_metadata) + "}</div>"
+
+                    st_html(html_output, height=400, scrolling=True)
+
+                    # display_metadata = {
+                    #     k: v for k, v in selected_metadata.items()
+                    #     if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    # }
+                    # st.json(display_metadata)
+
+            # Show PDF preview if available
+            if selected_metadata.get('has_pdf_preview', False):
+                # if st.button("👁️ Show Preview"):
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                        pdf_blob = bucket.blob(selected_metadata['pdf_storage_path'])
+                        pdf_blob.download_to_filename(tmp_file.name)
+                        # pdf_view()
+                        pdf_view(tmp_file.name)
+                except Exception as e:
+                    st.error(f"Failed to load preview: {str(e)}")
+            else:
+                st.write(f"Preview file unavailable.")
+
+        if st.button("Generate NDA Documents"):
+            st.session_state.nda_form_step = 3
+            st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    elif st.session_state.nda_form_step == 3:
         # Step 2: Preview and download
         # st.success("NDA generated successfully!")
-        with st.spinner("Loading template and generating agreement..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'nda_form_step', 1))
+        with st.spinner("Generating agreement..."):
+            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'nda_form_step', 2))
 
             the_name = st.session_state.nda_data['client_name']
             space_ = " "
@@ -1231,44 +1769,45 @@ def handle_nda():
 
 
             # Get template from Firestore
-            doc_type = "NDA"  # Changed to match your collection name
+            doc_type = "Project NDA"  # Changed to match your collection name
             try:
-                template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
-                templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
+                # template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+                # templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
+                #
+                # if not templates:
+                #     st.error("No templates found in the database for Internship Offer")
+                #     return
+                #
+                # # Get the first template (order_number = 1)
+                #
+                # template_doc = templates[0]
+                # template_data = template_doc.to_dict()
+                #
+                # # Visibility check
+                # if template_data.get('visibility', 'Private') != 'Public':
+                #     st.error("This Offer template is not currently available")
+                #     return
+                #
+                # # File type check
+                # if template_data.get(
+                #         'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                #     st.error("Template is not a valid Word document (.docx)")
+                #     return
+                #
+                # # Check if storage_path exists
+                # if 'storage_path' not in template_data:
+                #     st.error("Template storage path not found in the database")
+                #     return
+                #
+                # # Download the template file from Firebase Storage
+                # # bucket = storage.bucket()
+                # blob = bucket.blob(template_data['storage_path'])
+                #
+                # # Create a temporary file for the template
+                # with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
+                #     blob.download_to_filename(temp_template.name)
 
-                if not templates:
-                    st.error("No templates found in the database for Internship Offer")
-                    return
-
-                # Get the first template (order_number = 1)
-
-                template_doc = templates[0]
-                template_data = template_doc.to_dict()
-
-                # Visibility check
-                if template_data.get('visibility', 'Private') != 'Public':
-                    st.error("This Offer template is not currently available")
-                    return
-
-                # File type check
-                if template_data.get(
-                        'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                    st.error("Template is not a valid Word document (.docx)")
-                    return
-
-                # Check if storage_path exists
-                if 'storage_path' not in template_data:
-                    st.error("Template storage path not found in the database")
-                    return
-
-                # Download the template file from Firebase Storage
-                # bucket = storage.bucket()
-                blob = bucket.blob(template_data['storage_path'])
-
-                # Create a temporary file for the template
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
-                    blob.download_to_filename(temp_template.name)
-                    template_path = temp_template.name
+                template_path = st.session_state.selected_nda_template_path
 
             except Exception as e:
                 st.error(f"Error fetching template: {str(e)}")
@@ -1344,14 +1883,15 @@ def handle_nda():
                                            f"{st.session_state.nda_data['client_name']} {st.session_state.nda_data['client_company_name']} contract.docx",
                                            "DOCX", "NDA")
 
-        # Clean up temp files
-        try:
-            import os
-            os.unlink(template_path)
-            os.unlink(pdf_output)
-            os.unlink(docx_output)
-        except:
-            pass
+    #
+    #     # Clean up temp files
+    #     try:
+    #         import os
+    #         os.unlink(template_path)
+    #         os.unlink(pdf_output)
+    #         os.unlink(docx_output)
+    #     except:
+    #         pass
 
 
 def handle_invoice():
@@ -1938,6 +2478,423 @@ def align_text_fixed_width(text, total_char_width=12, alignment='center'):
     return text
 
 
+# def handle_proposal():
+#     st.title("📄 Proposal Form")
+#     regenerate_data = st.session_state.get('regenerate_data', {})
+#     is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Proposal"
+#     metadata = regenerate_data.get('metadata', {})
+#
+#     default_date = datetime.strptime(
+#         metadata.get("date", datetime.now().strftime('%d-%m-%Y')), '%d-%m-%Y').date()
+#     default_name = metadata.get("client_name", "")
+#     default_company_name = metadata.get("company_name", "")
+#     default_email = metadata.get("email", "")
+#     default_phone = metadata.get("phone", "")
+#     default_country = metadata.get("country", "")
+#     default_client_address = metadata.get("client_address", "")
+#     default_proposal_date = datetime.strptime(
+#         metadata.get("proposal_date", datetime.now().strftime('%d-%m-%Y')), '%d-%m-%Y').date()
+#
+#     st.session_state.setdefault("proposal_data", {})
+#     st.session_state.setdefault("proposal_form_step", 1)
+#     space_ = " "
+#
+#     # if 'proposal_data' not in st.session_state:
+#     #     st.session_state.proposal_data = {}
+#     #
+#     # # Initialize session state for multi-page form
+#     # if 'proposal_form_step' not in st.session_state:
+#     #     st.session_state.proposal_form_step = 1
+#     # st.session_state.proposal_data = {}
+#
+#     all_templates = get_proposal_template_details(firestore_db)
+#     folder_paths = fetch_proposal_templates_to_temp_dir(firestore_db, bucket)
+#
+#     # Step 1: Basic Information
+#     if st.session_state.proposal_form_step == 1:
+#         with st.form("proposal_form_step1"):
+#             st.subheader("Client Information")
+#             name = st.text_input("Client Name", value=default_name)
+#             company = st.text_input("Company Name", value=default_company_name)
+#             email = st.text_input("Email", value=default_email)
+#             phone = st.text_input("Phone", value=default_phone, placeholder="+1 234 5678")
+#             countries = sorted([country.name for country in pycountry.countries])
+#             country = st.selectbox("Select Country", countries,)
+#             proposal_date = st.date_input("Proposal Date", value=default_proposal_date)
+#
+#             if st.form_submit_button("Next: Select Cover Page"):
+#                 st.session_state.proposal_data = {
+#                     "client_name": name,
+#                     "company_name": company,
+#                     "email": email,
+#                     "phone": phone,
+#                     "country": country,
+#                     "proposal_date": proposal_date.strftime("%B %d, %Y")
+#                 }
+#                 if not st.session_state.proposal_data:
+#                     print("Proposal data not available")
+#                     # st.write("Proposal data not available")
+#                     st.error("Proposal data not available")
+#                 else:
+#
+#                     st.session_state.proposal_form_step = 2
+#                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+#
+#     elif st.session_state.proposal_form_step == 2:
+#         st.subheader("Select Cover page")
+#         print(f"st.session_state.proposal_data: {st.session_state.proposal_data}")
+#         st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 1))
+#
+#         cover_templates = [tpl for tpl in all_templates if tpl["proposal_section_type"] == "cover_page"]
+#
+#         # Build options with pdf_name as label
+#         cover_options = {
+#             tpl["pdf_name"] or tpl["original_name"]: tpl for tpl in cover_templates
+#         }
+#
+#         if not cover_options:
+#             st.error("No valid cover templates available. Cannot proceed.")
+#             st.stop()
+#
+#
+#
+#         col1, col2 = st.columns([1, 2])
+#
+#         with col1:
+#             with st.container():
+#                 st.markdown('<div class="custom-select-container">', unsafe_allow_html=True)
+#
+#                 selected_cover_name = st.selectbox(
+#                     "Choose a cover page style:",
+#                     options=list(cover_options.keys()),
+#                     index=0,
+#                     key="cover_template_select"
+#                 )
+#
+#                 st.markdown('</div>', unsafe_allow_html=True)
+#
+#             # selected_cover_name = st.selectbox(
+#             #     "Choose a cover page style:",
+#             #     options=list(cover_options.keys()),
+#             #     index=0,
+#             #     key="cover_template_select"
+#             # )
+#
+#             selected_template = cover_options[selected_cover_name]
+#             template_path = fetch_path_from_temp_dir("cover_page", selected_template, folder_paths)
+#
+#             if not template_path:
+#                 st.warning("Cover page template file not found.")
+#                 return
+#
+#             # Ensure output path is valid in Streamlit Cloud
+#             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_img:
+#                 temp_img_path = temp_img.name
+#             # temp_dir = tempfile.gettempdir()
+#             # output_pdf = os.path.join(temp_dir, "modified_cover.pdf")
+#
+#             # pdf_editor = EditTextFile(template_path)
+#             #
+#             # modifications = {
+#             #     "Name :": f": {st.session_state.proposal_data['client_name']}",
+#             #     "Email :": f": {st.session_state.proposal_data['email']}",
+#             #     "Phone :": f": {st.session_state.proposal_data['phone']}",
+#             #     "Country: ": f": {st.session_state.proposal_data['country']}",
+#             #     "Date": f"{st.session_state.proposal_data['proposal_date']}"
+#             # }
+#
+#             replace_pdf_placeholders(
+#                 input_path=template_path,
+#                 output_path=temp_img_path,
+#                 replacements={
+#                     "{ client_name }": f"{st.session_state.proposal_data['client_name']}",
+#                     # "{ client_name }": (
+#                     #     align_text_fixed_width(st.session_state.proposal_data['client_name'], 12, 'center'), 0, 7),
+#                     "{ client_email }": f"{st.session_state.proposal_data['email']}",
+#                     "{ client_phone }": f"{st.session_state.proposal_data['phone']}",
+#                     "{ client_country }": f"{st.session_state.proposal_data['country']}",
+#                     "{ date }": f" {st.session_state.proposal_data['proposal_date']}"
+#                 },
+#                 y_offset=20
+#             )
+#
+#             # print(f"modifications: {modifications}")
+#             #
+#             # pdf_editor.modify_pdf_fields(temp_img_path, modifications, 8)
+#
+#             # Preview
+#             if os.path.exists(temp_img_path):
+#                 pdf_view(temp_img_path)
+#             else:
+#                 st.warning("Preview not available")
+#
+#         with st.form("proposal_form_step2"):
+#             if st.form_submit_button("Next: Select Business Requirement Page"):
+#                 st.session_state.proposal_data["cover_template"] = temp_img_path
+#                 st.session_state.proposal_form_step = 3
+#                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+#
+#     elif st.session_state.proposal_form_step == 3:
+#         st.subheader("Select Business Requirement page")
+#         st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 2))
+#
+#         br_templates = [tpl for tpl in all_templates if tpl["proposal_section_type"] == "business_requirement"]
+#
+#         # Build options with pdf_name as label
+#         br_options = {
+#             tpl["pdf_name"] or tpl["original_name"]: tpl for tpl in br_templates
+#         }
+#
+#         if not br_options:
+#             st.error("No valid BR templates available. Cannot proceed.")
+#             st.stop()
+#
+#         if 'selected_br' not in st.session_state:
+#             st.session_state.selected_br = None
+#
+#         br_options_list = list(br_options.keys())
+#
+#         if (
+#                 st.session_state.selected_br is not None
+#                 and st.session_state.selected_br in br_options_list
+#         ):
+#             initial_br = br_options_list.index(st.session_state.selected_br)
+#         else:
+#             initial_br = 0
+#
+#         col1, col2 = st.columns([1, 2])
+#
+#         with col1:
+#
+#             selected_br_name = st.selectbox(
+#                 "Choose a business requirements page style:",
+#                 options=list(br_options.keys()),
+#                 index=0,
+#                 key="br_template_select"
+#             )
+#
+#             selected_br_template = br_options[selected_br_name]
+#             # st.session_state.selected_br = selected_br_name
+#         br_temp_dir = folder_paths.get("business_requirement")
+#         if br_temp_dir:
+#             # Find the matching file in the temp directory
+#             expected_filename = selected_br_template["original_name"]
+#             if not expected_filename.lower().endswith(".pdf"):
+#                 expected_filename += ".pdf"
+#
+#             template_path = os.path.join(br_temp_dir, expected_filename)
+#
+#             if os.path.exists(template_path):
+#                 the_name = st.session_state.proposal_data['client_name']
+#                 if len(the_name) > 14:
+#                     # lenght_dif = len(the_name) - 5
+#                     # new_text = f"{space_ * lenght_dif}      {the_name}"
+#                     new_text = the_name
+#                 elif len(the_name) < 14:
+#                     if len(the_name) < 8:
+#                         lenght_dif = 11 - len(the_name)
+#                         new_text = f"{space_ * lenght_dif}{the_name}"
+#                     else:
+#                         lenght_dif = 14 - len(the_name)
+#                         new_text = f"{space_ * lenght_dif}{the_name}"
+#                 else:
+#                     new_text = the_name
+#                 modifications = {
+#                     "{ client_name }": (f"{new_text}", 0, 7),
+#                     # "{ client_name }": (f"      {st.session_state.proposal_data['client_name']}", 0, 7),
+#                     # "{ client_name }": (
+#                     #     align_text_fixed_width(st.session_state.proposal_data['client_name'], 12, 'center'), 0, 7),
+#                     "{ date }": (f"{st.session_state.proposal_data['proposal_date']}", -30, 0)
+#                 }
+#                 with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_br:
+#                     temp_br_path = temp_br.name
+#                 # temp_dir = tempfile.gettempdir()
+#                 # output_pdf = os.path.join(temp_dir, "modified_testimonials.pdf")
+#                 editor = EditTextFile(template_path)
+#                 editor.modify_pdf_fields(temp_br_path, modifications)
+#
+#                 st.session_state.selected_br = temp_br_path
+#                 st.session_state.proposal_data["br_template"] = st.session_state.selected_br
+#                 try:
+#                     br_num_pages = selected_br_template.get("num_pages")
+#                     st.write(f"This BR template has {br_num_pages} page(s)")
+#                 except Exception as e:
+#                     st.warning(f"⚠️ Could not read number of pages of Template: {str(e)}")
+#                     st.stop()
+#
+#                 specific_templates = get_specific_templates(all_templates, br_num_pages)
+#
+#                 pdf_view(temp_br_path)
+#             else:
+#                 st.error(f"Template file not found: {template_path}")
+#         else:
+#             st.error("Business requirement templates directory not found")
+#
+#         with st.form("proposal_form_step4"):
+#             if st.form_submit_button("Next: Preview Proposal"):
+#
+#                 section_dir = folder_paths.get("page_3_6")
+#                 p3_p6_templates = [
+#                     os.path.join(section_dir, f)
+#                     for f in os.listdir(section_dir)
+#                     if f.lower().endswith(".pdf")
+#                 ]
+#                 st.session_state.proposal_data["p3_p6_template"] = p3_p6_templates
+#                 st.session_state.proposal_data["br_template"] = st.session_state.selected_br
+#                 table_of_contents = specific_templates.get("table_of_contents")
+#                 testimonial = specific_templates.get("testimonials")
+#
+#                 selected_table_of_content = fetch_path_from_temp_dir("table_of_contents", table_of_contents,
+#                                                                      folder_paths)
+#                 selected_testimonial = fetch_path_from_temp_dir("testimonials", testimonial, folder_paths)
+#                 st.session_state.proposal_data["table_of_contents"] = selected_table_of_content
+#                 st.session_state.proposal_data["testimonials"] = selected_testimonial
+#
+#                 merger_files = []
+#
+#                 # Cover page
+#                 cover = st.session_state.proposal_data.get("cover_template")
+#                 if cover and os.path.exists(cover):
+#                     merger_files.append(cover)
+#                 else:
+#                     st.info("Cover Template not available.")
+#
+#                 # Table of Contents
+#                 toc = st.session_state.proposal_data.get("table_of_contents")
+#                 if toc and os.path.exists(toc):
+#                     merger_files.append(toc)
+#                 else:
+#                     st.info("Table of Contents Template for the selected BR page count is unavailable.")
+#
+#                 # Page 3 to 6
+#                 p3_p6_list = st.session_state.proposal_data.get("p3_p6_template", [])
+#                 if p3_p6_list:
+#                     available_p3_p6 = [p for p in p3_p6_list if os.path.exists(p)]
+#                     if available_p3_p6:
+#                         merger_files.extend(available_p3_p6)
+#                     else:
+#                         st.info("Page 3 to 6 Templates are missing.")
+#                 else:
+#                     st.info("No Page 3 to 6 Templates found.")
+#
+#                 # Business Requirement
+#                 br = st.session_state.proposal_data.get("br_template")
+#                 if br and os.path.exists(br):
+#                     merger_files.append(br)
+#                 else:
+#                     st.info("Business Requirement Template unavailable.")
+#
+#                 # Testimonials
+#                 testimonials = st.session_state.proposal_data.get("testimonials")
+#                 if testimonials and os.path.exists(testimonials):
+#
+#                     merger_files.append(testimonials)
+#                 else:
+#                     st.info("Testimonial Template for the selected BR page count is unavailable.")
+#
+#                 for file_path in merger_files:
+#                     print(file_path)
+#                     if file_path is None:
+#                         continue
+#                     if not os.path.exists(file_path):
+#                         st.error(f"File not found: {file_path}")
+#                         return
+#
+#                 merger = Merger(merger_files)
+#                 merger.merge_pdf_files("merged_output.pdf")
+#
+#                 st.session_state.proposal_form_step = 4
+#                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+#     # Page 4: Final Preview and Download
+#     elif st.session_state.proposal_form_step == 4:
+#         st.subheader("📄 Final Proposal Preview")
+#         st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 3))
+#
+#         st.markdown("""
+#             <style>
+#                 .download-col > div {
+#                     text-align: center;
+#                 }
+#             </style>
+#         """, unsafe_allow_html=True)
+#
+#         # Proposal metadata summary
+#         st.markdown("#### 🧾 Proposal Details")
+#         col1, col2 = st.columns(2)
+#
+#         with col1:
+#             st.write(f"**Client Name:** {st.session_state.proposal_data['client_name']}")
+#             st.write(f"**Company:** {st.session_state.proposal_data['company_name']}")
+#             st.write(f"**Email:** {st.session_state.proposal_data['email']}")
+#             st.write(f"**Phone:** {st.session_state.proposal_data['phone']}")
+#
+#         with col2:
+#             st.write(f"**Country:** {st.session_state.proposal_data['country']}")
+#             st.write(f"**Proposal Date:** {st.session_state.proposal_data['proposal_date']}")
+#
+#         # st.divider()
+#         st.markdown("---")
+#
+#         # PDF Preview
+#         if os.path.exists("merged_output.pdf"):
+#             st.markdown("#### 📑 Preview of Merged Proposal")
+#             pdf_view("merged_output.pdf")
+#         else:
+#             st.error("Merged proposal file not found.")
+#             st.stop()
+#
+#         # st.divider()
+#         st.markdown("---")
+#         st.write(f"**Client Name:** {st.session_state.proposal_data['client_name']}")
+#         st.write(f"**Company:** {st.session_state.proposal_data['company_name']}")
+#         st.write(f"**Email:** {st.session_state.proposal_data['email']}")
+#         st.write(f"**Phone:** {st.session_state.proposal_data['phone']}")
+#         st.write(f"**Country:** {st.session_state.proposal_data['country']}")
+#         st.write(f"**Proposal Date:** {st.session_state.proposal_data['proposal_date']}")
+#         file_upload_details = {
+#             "client_name": st.session_state.proposal_data['client_name'],
+#             "company_name": st.session_state.proposal_data['company_name'],
+#             "email": st.session_state.proposal_data['email'],
+#             "phone": st.session_state.proposal_data['phone'],
+#             "country": st.session_state.proposal_data['country'],
+#             "proposal_date": st.session_state.proposal_data['proposal_date'],
+#             "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+#             "upload_timestamp": firestore.SERVER_TIMESTAMP,
+#         }
+#
+#         # Download section
+#         st.markdown("#### ⬇️ Download Final Proposal")
+#         download_col1, download_col2 = st.columns([2, 1], gap="medium")
+#
+#         with download_col1:
+#             default_filename = f"{st.session_state.proposal_data['client_name'].replace(' ', '_')} Proposal.pdf"
+#
+#             # Step 1: Confirm and upload
+#             if st.button("✅ Confirm and Upload Proposal"):
+#                 # storage_path, public_url = save_generated_file_to_firebase("merged_output.pdf", doc_type="Proposal",
+#                 #                                                            bucket=bucket)
+#                 save_generated_file_to_firebase_2(
+#                     "merged_output.pdf",
+#                     "Proposal",
+#                     bucket,
+#                     "PDF",
+#                     file_upload_details
+#                 )
+#
+#                 st.success("Now you can download the file:")
+#                 # Step 2: Show download link only after upload
+#                 generate_download_link("merged_output.pdf", default_filename, "PDF", "Proposal")
+#
+#         with download_col2:
+#             if st.button("🔁 Start Over"):
+#                 for key in [
+#                     'proposal_form_step', 'proposal_data', 'selected_br'
+#                 ]:
+#                     if key in st.session_state:
+#                         del st.session_state[key]
+#                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+
 def handle_proposal():
     st.title("📄 Proposal Form")
     regenerate_data = st.session_state.get('regenerate_data', {})
@@ -1959,14 +2916,6 @@ def handle_proposal():
     st.session_state.setdefault("proposal_form_step", 1)
     space_ = " "
 
-    # if 'proposal_data' not in st.session_state:
-    #     st.session_state.proposal_data = {}
-    #
-    # # Initialize session state for multi-page form
-    # if 'proposal_form_step' not in st.session_state:
-    #     st.session_state.proposal_form_step = 1
-    # st.session_state.proposal_data = {}
-
     all_templates = get_proposal_template_details(firestore_db)
     folder_paths = fetch_proposal_templates_to_temp_dir(firestore_db, bucket)
 
@@ -1979,7 +2928,7 @@ def handle_proposal():
             email = st.text_input("Email", value=default_email)
             phone = st.text_input("Phone", value=default_phone, placeholder="+1 234 5678")
             countries = sorted([country.name for country in pycountry.countries])
-            country = st.selectbox("Select Country", countries,)
+            country = st.selectbox("Select Country", countries)
             proposal_date = st.date_input("Proposal Date", value=default_proposal_date)
 
             if st.form_submit_button("Next: Select Cover Page"):
@@ -1991,23 +2940,15 @@ def handle_proposal():
                     "country": country,
                     "proposal_date": proposal_date.strftime("%B %d, %Y")
                 }
-                if not st.session_state.proposal_data:
-                    print("Proposal data not available")
-                    # st.write("Proposal data not available")
-                    st.error("Proposal data not available")
-                else:
-
-                    st.session_state.proposal_form_step = 2
+                st.session_state.proposal_form_step = 2
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
+    # Step 2: Cover Page Selection
     elif st.session_state.proposal_form_step == 2:
-        st.subheader("Select Cover page")
-        print(f"st.session_state.proposal_data: {st.session_state.proposal_data}")
+        st.subheader("Select Cover Page")
         st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 1))
 
         cover_templates = [tpl for tpl in all_templates if tpl["proposal_section_type"] == "cover_page"]
-
-        # Build options with pdf_name as label
         cover_options = {
             tpl["pdf_name"] or tpl["original_name"]: tpl for tpl in cover_templates
         }
@@ -2016,259 +2957,324 @@ def handle_proposal():
             st.error("No valid cover templates available. Cannot proceed.")
             st.stop()
 
-
-
-        col1, col2 = st.columns([1, 2])
-
+        col1, col2 = st.columns([5, 1])
         with col1:
-            with st.container():
-                st.markdown('<div class="custom-select-container">', unsafe_allow_html=True)
-
-                selected_cover_name = st.selectbox(
-                    "Choose a cover page style:",
-                    options=list(cover_options.keys()),
-                    index=0,
-                    key="cover_template_select"
-                )
-
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            # selected_cover_name = st.selectbox(
-            #     "Choose a cover page style:",
-            #     options=list(cover_options.keys()),
-            #     index=0,
-            #     key="cover_template_select"
-            # )
-
+            selected_cover_name = st.selectbox(
+                "Choose a cover page style:",
+                options=list(cover_options.keys()),
+                index=0,
+                key="cover_template_select"
+            )
             selected_template = cover_options[selected_cover_name]
+
+            st.subheader("Template Details")
+            st.json({
+                "Name": selected_template["name"],
+                "Original Name": selected_template["original_name"],
+                "File Type": selected_template["file_type"],
+                "Size (KB)": selected_template["size_kb"],
+                "Upload Date": selected_template["upload_date"],
+                "Pages": selected_template["num_pages"],
+                "Description": selected_template["description"],
+                "Order Number": selected_template["order_number"],
+                "Active": selected_template["is_active"]
+            })
+
             template_path = fetch_path_from_temp_dir("cover_page", selected_template, folder_paths)
 
             if not template_path:
                 st.warning("Cover page template file not found.")
                 return
 
-            # Ensure output path is valid in Streamlit Cloud
             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_img:
                 temp_img_path = temp_img.name
-            # temp_dir = tempfile.gettempdir()
-            # output_pdf = os.path.join(temp_dir, "modified_cover.pdf")
-
-            # pdf_editor = EditTextFile(template_path)
-            #
-            # modifications = {
-            #     "Name :": f": {st.session_state.proposal_data['client_name']}",
-            #     "Email :": f": {st.session_state.proposal_data['email']}",
-            #     "Phone :": f": {st.session_state.proposal_data['phone']}",
-            #     "Country: ": f": {st.session_state.proposal_data['country']}",
-            #     "Date": f"{st.session_state.proposal_data['proposal_date']}"
-            # }
 
             replace_pdf_placeholders(
                 input_path=template_path,
                 output_path=temp_img_path,
                 replacements={
                     "{ client_name }": f"{st.session_state.proposal_data['client_name']}",
-                    # "{ client_name }": (
-                    #     align_text_fixed_width(st.session_state.proposal_data['client_name'], 12, 'center'), 0, 7),
                     "{ client_email }": f"{st.session_state.proposal_data['email']}",
                     "{ client_phone }": f"{st.session_state.proposal_data['phone']}",
                     "{ client_country }": f"{st.session_state.proposal_data['country']}",
                     "{ date }": f" {st.session_state.proposal_data['proposal_date']}"
                 },
-                y_offset=20
+                y_offset=25
             )
 
-            # print(f"modifications: {modifications}")
-            #
-            # pdf_editor.modify_pdf_fields(temp_img_path, modifications, 8)
-
-            # Preview
             if os.path.exists(temp_img_path):
                 pdf_view(temp_img_path)
             else:
                 st.warning("Preview not available")
 
         with st.form("proposal_form_step2"):
-            if st.form_submit_button("Next: Select Business Requirement Page"):
+            if st.form_submit_button("Next: Select Table of Contents"):
                 st.session_state.proposal_data["cover_template"] = temp_img_path
                 st.session_state.proposal_form_step = 3
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
+    # Step 3: Table of Contents Selection
     elif st.session_state.proposal_form_step == 3:
-        st.subheader("Select Business Requirement page")
+        st.subheader("Select Table of Contents")
         st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 2))
 
-        br_templates = [tpl for tpl in all_templates if tpl["proposal_section_type"] == "business_requirement"]
+        toc_templates = [tpl for tpl in all_templates if tpl["proposal_section_type"] == "table_of_contents"]
+        toc_options = {
+            tpl["pdf_name"] or tpl["original_name"]: tpl for tpl in toc_templates
+        }
 
-        # Build options with pdf_name as label
+        if not toc_options:
+            st.error("No valid table of contents templates available.")
+            st.stop()
+
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            selected_toc_name = st.selectbox(
+                "Choose a table of contents style:",
+                options=list(toc_options.keys()),
+                index=0,
+                key="toc_template_select"
+            )
+            selected_template = toc_options[selected_toc_name]
+
+            st.subheader("Template Details")
+            st.json({
+                "Name": selected_template["name"],
+                "Original Name": selected_template["original_name"],
+                "File Type": selected_template["file_type"],
+                "Size (KB)": selected_template["size_kb"],
+                "Upload Date": selected_template["upload_date"],
+                "Pages": selected_template["num_pages"],
+                "Description": selected_template["description"],
+                "Order Number": selected_template["order_number"],
+                "Active": selected_template["is_active"]
+            })
+
+            template_path = fetch_path_from_temp_dir("table_of_contents", selected_template, folder_paths)
+
+            if not template_path:
+                st.warning("Table of contents template file not found.")
+                return
+
+            # with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_toc:
+            #     temp_toc_path = temp_toc.name
+
+            # Apply any necessary modifications to the TOC template
+            # (Add your modification logic here if needed)
+
+            if os.path.exists(template_path):
+                pdf_view(template_path)
+            else:
+                st.warning("Preview not available")
+
+        with st.form("proposal_form_step3"):
+            if st.form_submit_button("Next: Select Pages 3-6"):
+                st.session_state.proposal_data["table_of_contents"] = template_path
+                st.session_state.proposal_form_step = 4
+                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    # Step 4: Pages 3-6 Selection
+    elif st.session_state.proposal_form_step == 4:
+        st.subheader("Select Pages 3-6")
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 3))
+
+        p3_p6_templates = [tpl for tpl in all_templates if tpl["proposal_section_type"] == "page_3_6"]
+        p3_p6_options = {
+            tpl["pdf_name"] or tpl["original_name"]: tpl for tpl in p3_p6_templates
+        }
+
+        if not p3_p6_options:
+            st.error("No valid page 3-6 templates available.")
+            st.stop()
+
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            selected_p3_p6_name = st.selectbox(
+                "Choose pages 3-6 style:",
+                options=list(p3_p6_options.keys()),
+                index=0,
+                key="p3_p6_template_select"
+            )
+            selected_template = p3_p6_options[selected_p3_p6_name]
+
+            st.subheader("Template Details")
+            st.json({
+                "Name": selected_template["name"],
+                "Original Name": selected_template["original_name"],
+                "File Type": selected_template["file_type"],
+                "Size (KB)": selected_template["size_kb"],
+                "Upload Date": selected_template["upload_date"],
+                "Pages": selected_template["num_pages"],
+                "Description": selected_template["description"],
+                "Order Number": selected_template["order_number"],
+                "Active": selected_template["is_active"]
+            })
+
+            template_path = fetch_path_from_temp_dir("page_3_6", selected_template, folder_paths)
+
+            if not template_path:
+                st.warning("Pages 3-6 template file not found.")
+                return
+
+            # with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_p3_p6:
+            #     temp_p3_p6_path = temp_p3_p6.name
+
+            # Apply any necessary modifications to the pages 3-6 template
+            # (Add your modification logic here if needed)
+
+            if os.path.exists(template_path):
+                pdf_view(template_path)
+            else:
+                st.warning("Preview not available")
+
+        with st.form("proposal_form_step4"):
+            if st.form_submit_button("Next: Select Business Requirements"):
+                st.session_state.proposal_data["p3_p6_template"] = template_path  # Storing as list for consistency
+                st.session_state.proposal_form_step = 5
+                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    # Step 5: Business Requirements Selection
+    elif st.session_state.proposal_form_step == 5:
+        st.subheader("Select Business Requirements Page")
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 4))
+
+        br_templates = [tpl for tpl in all_templates if tpl["proposal_section_type"] == "business_requirement"]
         br_options = {
             tpl["pdf_name"] or tpl["original_name"]: tpl for tpl in br_templates
         }
 
         if not br_options:
-            st.error("No valid BR templates available. Cannot proceed.")
+            st.error("No valid business requirements templates available.")
             st.stop()
 
-        if 'selected_br' not in st.session_state:
-            st.session_state.selected_br = None
-
-        br_options_list = list(br_options.keys())
-
-        if (
-                st.session_state.selected_br is not None
-                and st.session_state.selected_br in br_options_list
-        ):
-            initial_br = br_options_list.index(st.session_state.selected_br)
-        else:
-            initial_br = 0
-
-        col1, col2 = st.columns([1, 2])
-
+        col1, col2 = st.columns([5, 1])
         with col1:
-
             selected_br_name = st.selectbox(
-                "Choose a business requirements page style:",
+                "Choose a business requirements style:",
                 options=list(br_options.keys()),
                 index=0,
                 key="br_template_select"
             )
+            selected_template = br_options[selected_br_name]
 
-            selected_br_template = br_options[selected_br_name]
-            # st.session_state.selected_br = selected_br_name
-        br_temp_dir = folder_paths.get("business_requirement")
-        if br_temp_dir:
-            # Find the matching file in the temp directory
-            expected_filename = selected_br_template["original_name"]
-            if not expected_filename.lower().endswith(".pdf"):
-                expected_filename += ".pdf"
+            st.subheader("Template Details")
+            st.json({
+                "Name": selected_template["name"],
+                "Original Name": selected_template["original_name"],
+                "File Type": selected_template["file_type"],
+                "Size (KB)": selected_template["size_kb"],
+                "Upload Date": selected_template["upload_date"],
+                "Pages": selected_template["num_pages"],
+                "Description": selected_template["description"],
+                "Order Number": selected_template["order_number"],
+                "Active": selected_template["is_active"]
+            })
 
-            template_path = os.path.join(br_temp_dir, expected_filename)
+            template_path = fetch_path_from_temp_dir("business_requirement", selected_template, folder_paths)
 
-            if os.path.exists(template_path):
-                the_name = st.session_state.proposal_data['client_name']
-                if len(the_name) > 14:
-                    # lenght_dif = len(the_name) - 5
-                    # new_text = f"{space_ * lenght_dif}      {the_name}"
-                    new_text = the_name
-                elif len(the_name) < 14:
-                    if len(the_name) < 8:
-                        lenght_dif = 11 - len(the_name)
-                        new_text = f"{space_ * lenght_dif}{the_name}"
-                    else:
-                        lenght_dif = 14 - len(the_name)
-                        new_text = f"{space_ * lenght_dif}{the_name}"
+            if not template_path:
+                st.warning("Business requirements template file not found.")
+                return
+
+            # with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_br:
+            #     temp_br_path = temp_br.name
+
+            # Apply modifications to BR template
+            the_name = st.session_state.proposal_data['client_name']
+            if len(the_name) > 14:
+                new_text = the_name
+            elif len(the_name) < 14:
+                if len(the_name) < 8:
+                    lenght_dif = 11 - len(the_name)
+                    new_text = f"{space_ * lenght_dif}{the_name}"
                 else:
-                    new_text = the_name
-                modifications = {
-                    "{ client_name }": (f"{new_text}", 0, 7),
-                    # "{ client_name }": (f"      {st.session_state.proposal_data['client_name']}", 0, 7),
-                    # "{ client_name }": (
-                    #     align_text_fixed_width(st.session_state.proposal_data['client_name'], 12, 'center'), 0, 7),
-                    "{ date }": (f"{st.session_state.proposal_data['proposal_date']}", -30, 0)
-                }
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_br:
-                    temp_br_path = temp_br.name
-                # temp_dir = tempfile.gettempdir()
-                # output_pdf = os.path.join(temp_dir, "modified_testimonials.pdf")
-                editor = EditTextFile(template_path)
-                editor.modify_pdf_fields(temp_br_path, modifications)
+                    lenght_dif = 14 - len(the_name)
+                    new_text = f"{space_ * lenght_dif}{the_name}"
+            else:
+                new_text = the_name
 
-                st.session_state.selected_br = temp_br_path
-                st.session_state.proposal_data["br_template"] = st.session_state.selected_br
-                try:
-                    br_num_pages = selected_br_template.get("num_pages")
-                    st.write(f"This BR template has {br_num_pages} page(s)")
-                except Exception as e:
-                    st.warning(f"⚠️ Could not read number of pages of Template: {str(e)}")
-                    st.stop()
+            modifications = {
+                "{ client_name }": (f"{new_text}", 0, 7),
+                "{ date }": (f"{st.session_state.proposal_data['proposal_date']}", -30, 0)
+            }
+            editor = EditTextFile(template_path)
+            editor.modify_pdf_fields(temp_br_path, modifications)
 
-                specific_templates = get_specific_templates(all_templates, br_num_pages)
-
+            if os.path.exists(temp_br_path):
                 pdf_view(temp_br_path)
             else:
-                st.error(f"Template file not found: {template_path}")
-        else:
-            st.error("Business requirement templates directory not found")
+                st.warning("Preview not available")
 
-        with st.form("proposal_form_step4"):
-            if st.form_submit_button("Next: Preview Proposal"):
-
-                section_dir = folder_paths.get("page_3_6")
-                p3_p6_templates = [
-                    os.path.join(section_dir, f)
-                    for f in os.listdir(section_dir)
-                    if f.lower().endswith(".pdf")
-                ]
-                st.session_state.proposal_data["p3_p6_template"] = p3_p6_templates
-                st.session_state.proposal_data["br_template"] = st.session_state.selected_br
-                table_of_contents = specific_templates.get("table_of_contents")
-                testimonial = specific_templates.get("testimonials")
-
-                selected_table_of_content = fetch_path_from_temp_dir("table_of_contents", table_of_contents,
-                                                                     folder_paths)
-                selected_testimonial = fetch_path_from_temp_dir("testimonials", testimonial, folder_paths)
-                st.session_state.proposal_data["table_of_contents"] = selected_table_of_content
-                st.session_state.proposal_data["testimonials"] = selected_testimonial
-
-                merger_files = []
-
-                # Cover page
-                cover = st.session_state.proposal_data.get("cover_template")
-                if cover and os.path.exists(cover):
-                    merger_files.append(cover)
-                else:
-                    st.info("Cover Template not available.")
-
-                # Table of Contents
-                toc = st.session_state.proposal_data.get("table_of_contents")
-                if toc and os.path.exists(toc):
-                    merger_files.append(toc)
-                else:
-                    st.info("Table of Contents Template for the selected BR page count is unavailable.")
-
-                # Page 3 to 6
-                p3_p6_list = st.session_state.proposal_data.get("p3_p6_template", [])
-                if p3_p6_list:
-                    available_p3_p6 = [p for p in p3_p6_list if os.path.exists(p)]
-                    if available_p3_p6:
-                        merger_files.extend(available_p3_p6)
-                    else:
-                        st.info("Page 3 to 6 Templates are missing.")
-                else:
-                    st.info("No Page 3 to 6 Templates found.")
-
-                # Business Requirement
-                br = st.session_state.proposal_data.get("br_template")
-                if br and os.path.exists(br):
-                    merger_files.append(br)
-                else:
-                    st.info("Business Requirement Template unavailable.")
-
-                # Testimonials
-                testimonials = st.session_state.proposal_data.get("testimonials")
-                if testimonials and os.path.exists(testimonials):
-
-                    merger_files.append(testimonials)
-                else:
-                    st.info("Testimonial Template for the selected BR page count is unavailable.")
-
-                for file_path in merger_files:
-                    print(file_path)
-                    if file_path is None:
-                        continue
-                    if not os.path.exists(file_path):
-                        st.error(f"File not found: {file_path}")
-                        return
-
-                merger = Merger(merger_files)
-                merger.merge_pdf_files("merged_output.pdf")
-
-                st.session_state.proposal_form_step = 4
+        with st.form("proposal_form_step5"):
+            if st.form_submit_button("Next: Select Testimonials"):
+                st.session_state.proposal_data["br_template"] = temp_br_path
+                st.session_state.proposal_form_step = 6
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
-    # Page 4: Final Preview and Download
-    elif st.session_state.proposal_form_step == 4:
+
+    # Step 6: Testimonials Selection
+    elif st.session_state.proposal_form_step == 6:
+        st.subheader("Select Testimonials Page")
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 5))
+
+        testimonial_templates = [tpl for tpl in all_templates if tpl["proposal_section_type"] == "testimonials"]
+        testimonial_options = {
+            tpl["pdf_name"] or tpl["original_name"]: tpl for tpl in testimonial_templates
+        }
+
+        if not testimonial_options:
+            st.error("No valid testimonial templates available.")
+            st.stop()
+
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            selected_testimonial_name = st.selectbox(
+                "Choose a testimonials style:",
+                options=list(testimonial_options.keys()),
+                index=0,
+                key="testimonial_template_select"
+            )
+            selected_template = testimonial_options[selected_testimonial_name]
+
+            st.subheader("Template Details")
+            st.json({
+                "Name": selected_template["name"],
+                "Original Name": selected_template["original_name"],
+                "File Type": selected_template["file_type"],
+                "Size (KB)": selected_template["size_kb"],
+                "Upload Date": selected_template["upload_date"],
+                "Pages": selected_template["num_pages"],
+                "Description": selected_template["description"],
+                "Order Number": selected_template["order_number"],
+                "Active": selected_template["is_active"]
+            })
+
+            template_path = fetch_path_from_temp_dir("testimonials", selected_template, folder_paths)
+
+            if not template_path:
+                st.warning("Testimonials template file not found.")
+                return
+
+            # with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_testimonial:
+            #     temp_testimonial_path = temp_testimonial.name
+
+            # Apply any necessary modifications to the testimonials template
+            # (Add your modification logic here if needed)
+
+            if os.path.exists(template_path):
+                pdf_view(template_path)
+            else:
+                st.warning("Preview not available")
+
+        with st.form("proposal_form_step6"):
+            if st.form_submit_button("Next: Preview Proposal"):
+                st.session_state.proposal_data["testimonials"] = template_path
+                st.session_state.proposal_form_step = 7
+                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    # Step 7: Final Preview and Download
+    elif st.session_state.proposal_form_step == 7:
         st.subheader("📄 Final Proposal Preview")
-        st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 3))
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'proposal_form_step', 6))
 
         st.markdown("""
             <style>
@@ -2292,25 +3298,76 @@ def handle_proposal():
             st.write(f"**Country:** {st.session_state.proposal_data['country']}")
             st.write(f"**Proposal Date:** {st.session_state.proposal_data['proposal_date']}")
 
-        # st.divider()
         st.markdown("---")
 
+        # Merge all selected templates
+        merger_files = []
+
+        # Cover page
+        cover = st.session_state.proposal_data.get("cover_template")
+        if cover and os.path.exists(cover):
+            merger_files.append(cover)
+        else:
+            st.info("Cover Template not available.")
+
+        # Table of Contents
+        toc = st.session_state.proposal_data.get("table_of_contents")
+        if toc and os.path.exists(toc):
+            merger_files.append(toc)
+        else:
+            st.info("Table of Contents Template is unavailable.")
+
+        # Page 3 to 6
+        p3_p6_list = st.session_state.proposal_data.get("p3_p6_template", [])
+        if p3_p6_list:
+            available_p3_p6 = [p for p in p3_p6_list if os.path.exists(p)]
+            if available_p3_p6:
+                merger_files.extend(available_p3_p6)
+            else:
+                st.info("Page 3 to 6 Templates are missing.")
+        else:
+            st.info("No Page 3 to 6 Templates found.")
+
+        # Business Requirement
+        br = st.session_state.proposal_data.get("br_template")
+        if br and os.path.exists(br):
+            merger_files.append(br)
+        else:
+            st.info("Business Requirement Template unavailable.")
+
+        # Testimonials
+        testimonials = st.session_state.proposal_data.get("testimonials")
+        if testimonials and os.path.exists(testimonials):
+            merger_files.append(testimonials)
+        else:
+            st.info("Testimonial Template is unavailable.")
+
+        # Validate all files exist before merging
+        for file_path in merger_files:
+            if file_path is None:
+                continue
+            if not os.path.exists(file_path):
+                st.error(f"File not found: {file_path}")
+                return
+
+        # Merge and preview
+        merger = Merger(merger_files)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_merger:
+            temp_merger_path = temp_merger.name
+
+        merger.merge_pdf_files(temp_merger_path)
+
         # PDF Preview
-        if os.path.exists("merged_output.pdf"):
+        if os.path.exists(temp_merger_path):
             st.markdown("#### 📑 Preview of Merged Proposal")
-            pdf_view("merged_output.pdf")
+            pdf_view(temp_merger_path)
         else:
             st.error("Merged proposal file not found.")
             st.stop()
 
-        # st.divider()
         st.markdown("---")
-        st.write(f"**Client Name:** {st.session_state.proposal_data['client_name']}")
-        st.write(f"**Company:** {st.session_state.proposal_data['company_name']}")
-        st.write(f"**Email:** {st.session_state.proposal_data['email']}")
-        st.write(f"**Phone:** {st.session_state.proposal_data['phone']}")
-        st.write(f"**Country:** {st.session_state.proposal_data['country']}")
-        st.write(f"**Proposal Date:** {st.session_state.proposal_data['proposal_date']}")
+
+        # Prepare metadata for upload
         file_upload_details = {
             "client_name": st.session_state.proposal_data['client_name'],
             "company_name": st.session_state.proposal_data['company_name'],
@@ -2327,29 +3384,23 @@ def handle_proposal():
         download_col1, download_col2 = st.columns([2, 1], gap="medium")
 
         with download_col1:
-            default_filename = f"{st.session_state.proposal_data['client_name'].replace(' ', '_')} Proposal.pdf"
+            default_filename = f"{st.session_state.proposal_data['client_name'].replace(' ', '_')}_Proposal.pdf"
 
-            # Step 1: Confirm and upload
             if st.button("✅ Confirm and Upload Proposal"):
-                # storage_path, public_url = save_generated_file_to_firebase("merged_output.pdf", doc_type="Proposal",
-                #                                                            bucket=bucket)
                 save_generated_file_to_firebase_2(
-                    "merged_output.pdf",
+                    temp_merger_path,
                     "Proposal",
                     bucket,
                     "PDF",
                     file_upload_details
                 )
-
                 st.success("Now you can download the file:")
-                # Step 2: Show download link only after upload
-                generate_download_link("merged_output.pdf", default_filename, "PDF", "Proposal")
+                generate_download_link(temp_merger_path, default_filename, "PDF", "Proposal")
 
         with download_col2:
             if st.button("🔁 Start Over"):
-                for key in [
-                    'proposal_form_step', 'proposal_data', 'selected_br'
-                ]:
+                for key in ['proposal_form_step', 'proposal_data', 'selected_br']:
                     if key in st.session_state:
                         del st.session_state[key]
                 st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+

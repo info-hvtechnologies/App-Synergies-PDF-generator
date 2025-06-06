@@ -21,7 +21,7 @@
 
 import fitz  # PyMuPDF
 
-def replace_pdf_placeholders(input_path, output_path, replacements, y_offset=0, padding=3):
+def replace_pdf_placeholders(input_path, output_path, replacements, y_offset=0, padding=7):
     doc = fitz.open(input_path)
 
     for page in doc:
@@ -43,7 +43,7 @@ def replace_pdf_placeholders(input_path, output_path, replacements, y_offset=0, 
 
         for inst, replacement in positions:
             new_position = fitz.Point(inst.x0, inst.y0 + y_offset)
-            page.insert_text(new_position, replacement, fontsize=22, color=(0, 0, 0))
+            page.insert_text(new_position, replacement, fontsize=20, color=(0, 0, 0))
 
     doc.save(output_path)
     doc.close()
