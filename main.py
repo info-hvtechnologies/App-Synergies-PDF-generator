@@ -1481,7 +1481,7 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
                                     file_bytes = file.read()
 
                                 st.download_button(
-                                    label="⬇️ Download Document",
+                                    label="⬇️ Download",
                                     data=file_bytes,
                                     file_name=data.get("name", "document.pdf"),
                                     mime="application/octet-stream",  # You can change MIME type if known
