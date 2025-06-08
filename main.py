@@ -1468,6 +1468,29 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
                         else:
                             st.caption(f"Preview to Regenerate {doc_type}.")
 
+                        # Download button
+                        if 'storage_path' in data:
+                            try:
+                                blob = bucket.blob(data['storage_path'])
+
+                                # Download to a temporary file
+                                with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                                    blob.download_to_filename(tmp_file.name)
+
+                                with open(tmp_file.name, "rb") as file:
+                                    file_bytes = file.read()
+
+                                st.download_button(
+                                    label="⬇️ Download Document",
+                                    data=file_bytes,
+                                    file_name=data.get("name", "document.pdf"),
+                                    mime="application/octet-stream",  # You can change MIME type if known
+                                    key=f"download_{doc_id}"
+                                )
+
+                            except Exception as e:
+                                st.error(f"Error downloading file: {e}")
+
                         # Delete button
                         if st.button("🗑️ Delete", key=f"delete_{doc_id}"):
                             try:
