@@ -167,6 +167,8 @@ if selected_option == "Admin Panel":
                         help="Public templates can be accessed by all users"
                     )
 
+                    order = st.number_input("Template Order", min_value=1, value=1)
+
                     description = st.text_area("Template Description",
                                                placeholder="Enter a detailed description of the template including its purpose and usage")
 
@@ -228,6 +230,7 @@ if selected_option == "Admin Panel":
                                     "display_name": display_name,
                                     "original_name": uploaded_file.name,
                                     "doc_type": doc_type,
+                                    "order": order,
                                     "file_type": uploaded_file.type,
                                     "size_kb": f"{len(uploaded_file.getvalue()) / 1024:.1f}",
                                     "size_bytes": len(uploaded_file.getvalue()),
@@ -637,8 +640,22 @@ if selected_option == "Admin Panel":
 
                 for section_label, section_key in section_map.items():
                     st.markdown(f"### 📂 {section_label}")
-                    templates = template_ref.collection(section_key).order_by("upload_timestamp",
-                                                                              direction="DESCENDING").get()
+                    # templates = template_ref.collection(section_key).order_by("upload_timestamp",
+                    #                                                           direction="DESCENDING").get()
+                    # templates = template_ref.collection(section_key).order_by("order",
+                    #                                                           direction="DESCENDING").get()
+
+                    docs = template_ref.collection(section_key).get()
+
+                    # Sort manually: if 'order' exists, use it; otherwise, fallback to 'upload_timestamp'
+                    templates = sorted(
+                        docs,
+                        key=lambda doc: (
+                            -(doc.to_dict().get("order", float('-inf')) if "order" in doc.to_dict() else 0),
+                            doc.to_dict().get("upload_timestamp")
+                        ),
+                        # reverse=True
+                    )
 
                     if not templates:
                         st.info(f"No templates in {section_label}")
@@ -669,6 +686,13 @@ if selected_option == "Admin Panel":
                                     "PDF Name",
                                     value=template_data.get("pdf_name", ""),
                                     key=f"pdf_name_{doc_id}",
+                                    disabled=not st.session_state[f"edit_mode_{doc_id}"]
+                                )
+                                new_order = st.number_input(
+                                    "Order",
+                                    min_value=0,
+                                    value=int(template_data.get("oder", 0)),
+                                    key=f"order_{doc_id}",
                                     disabled=not st.session_state[f"edit_mode_{doc_id}"]
                                 )
                                 new_num_pages = st.number_input(
@@ -722,6 +746,7 @@ if selected_option == "Admin Panel":
                                         update_data = {
                                             "display_name": new_display_name,
                                             "description": new_desc,
+                                            "order": new_order,
                                             "visibility": new_vis,
                                             "pdf_name": new_name,
                                             "num_pages": new_num_pages,
@@ -844,8 +869,19 @@ if selected_option == "Admin Panel":
                                 f"**Download:** [{template_data['original_name']}]({template_data['download_url']})")
 
             else:
-                templates = template_ref.collection("templates").order_by("upload_timestamp",
-                                                                          direction="DESCENDING").get()
+                # templates = template_ref.collection("templates").order_by("upload_timestamp",
+                #                                                           direction="DESCENDING").get()
+
+                docs = template_ref.collection("templates").get()
+                templates = sorted(
+                    docs,
+                    key=lambda doc: (
+                        -(doc.to_dict().get("order", float('-inf')) if "order" in doc.to_dict() else 0),
+                        doc.to_dict().get("upload_timestamp")
+                    ),
+                    # reverse=True
+                )
+
                 if not templates:
                     st.info("No templates found.")
                     return
@@ -868,6 +904,13 @@ if selected_option == "Admin Panel":
                                 "Display Name",
                                 value=template_data.get("display_name", ""),
                                 key=f"display_name_{doc_id}",
+                                disabled=not st.session_state[f"edit_mode_{doc_id}"]
+                            )
+                            new_order = st.number_input(
+                                "Order",
+                                min_value=0,
+                                value=int(template_data.get("oder", 0)),
+                                key=f"order_{doc_id}",
                                 disabled=not st.session_state[f"edit_mode_{doc_id}"]
                             )
                             new_desc = st.text_area(
@@ -912,14 +955,81 @@ if selected_option == "Admin Panel":
                                 if st.button("💾 Save Changes", key=f"save_{doc_id}"):
                                     update_data = {
                                         "display_name": new_display_name,
+                                        "order": new_order,
                                         "description": new_desc,
                                         "visibility": new_vis,
                                         "last_updated": firestore.SERVER_TIMESTAMP
                                     }
-                                    template_ref.collection("templates").document(doc_id).update(update_data)
-                                    st.session_state[f"edit_mode_{doc_id}"] = False
-                                    st.success("Metadata updated successfully")
-                                    st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+                                    if (doc_type != "Proposal" and
+                                            template_data[
+                                                'file_type'] == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' and
+                                            not template_data.get('has_pdf_preview', False)):
+
+                                        try:
+                                            with st.spinner("Generating PDF preview..."):
+                                                # Create temp directory
+                                                temp_dir = os.path.join(tempfile.gettempdir(), "as_docgen")
+                                                os.makedirs(temp_dir, exist_ok=True)
+
+                                                # Create temp file paths
+                                                temp_docx = os.path.join(temp_dir, f"regenerate_{doc_id}.docx")
+                                                temp_pdf = os.path.join(temp_dir, f"preview_{doc_id}.pdf")
+
+                                                # Download original DOCX
+                                                blob = bucket.blob(template_data['storage_path'])
+                                                blob.download_to_filename(temp_docx)
+
+                                                # Convert to PDF
+                                                main_converter(temp_docx, temp_pdf)
+
+                                                # Upload PDF version
+                                                clean_name = new_display_name or template_data.get('display_name',
+                                                                                                   'preview')
+                                                pdf_storage_path = f"AS_DOC_Gen/{doc_type.lower().replace(' ', '_')}/pdf_previews/{clean_name.replace(' ', '_')}_{doc_id}.pdf"
+                                                pdf_blob = bucket.blob(pdf_storage_path)
+
+                                                with open(temp_pdf, 'rb') as pdf_file:
+                                                    pdf_blob.upload_from_file(pdf_file,
+                                                                              content_type='application/pdf')
+
+                                                # Generate PDF URL
+                                                pdf_url = pdf_blob.generate_signed_url(
+                                                    expiration=datetime.timedelta(days=365 * 10),
+                                                    version="v4"
+                                                ) if new_vis == "Private" else pdf_blob.public_url
+
+                                                # Add PDF metadata to update
+                                                update_data.update({
+                                                    "pdf_preview_url": pdf_url,
+                                                    "pdf_storage_path": pdf_storage_path,
+                                                    "has_pdf_preview": True
+                                                })
+
+                                                st.success("PDF preview generated successfully")
+
+                                        except Exception as e:
+                                            st.error(f"Failed to generate PDF preview: {str(e)}")
+                                            st.exception(e)
+                                        finally:
+                                            # Clean up temp files if they exist
+                                            if os.path.exists(temp_docx):
+                                                os.remove(temp_docx)
+                                            if os.path.exists(temp_pdf):
+                                                os.remove(temp_pdf)
+
+                                    # Update Firestore document
+                                    try:
+                                        template_ref.collection("templates").document(doc_id).update(update_data)
+                                        st.session_state[f"edit_mode_{doc_id}"] = False
+                                        st.success("Metadata updated successfully")
+                                        st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Failed to update template: {str(e)}")
+
+                                    # template_ref.collection("templates").document(doc_id).update(update_data)
+                                    # st.session_state[f"edit_mode_{doc_id}"] = False
+                                    # st.success("Metadata updated successfully")
+                                    # st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
                             # Preview toggle button
                             preview_button_label = "👁️ Show Preview" if not st.session_state[
