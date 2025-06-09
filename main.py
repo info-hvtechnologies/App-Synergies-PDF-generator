@@ -654,7 +654,7 @@ if selected_option == "Admin Panel":
                             -(doc.to_dict().get("order", float('-inf')) if "order" in doc.to_dict() else 0),
                             doc.to_dict().get("upload_timestamp")
                         ),
-                        # reverse=True
+                        reverse=True
                     )
 
                     if not templates:
@@ -879,7 +879,7 @@ if selected_option == "Admin Panel":
                         -(doc.to_dict().get("order", float('-inf')) if "order" in doc.to_dict() else 0),
                         doc.to_dict().get("upload_timestamp")
                     ),
-                    # reverse=True
+                    reverse=True
                 )
 
                 if not templates:
