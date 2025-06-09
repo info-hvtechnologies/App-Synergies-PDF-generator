@@ -432,6 +432,7 @@ def handle_internship_certificate():
                     st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
                     st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
                     st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+                    st.markdown(f"**Description:** `{selected_metadata.get('description', 'Unknown')} `")
 
                 with tab2:
                     from streamlit.components.v1 import html as st_html
@@ -531,7 +532,7 @@ def handle_internship_certificate():
 
             st.subheader("Download Documents")
             col1, col2 = st.columns(2)
-            file_prefix = f"{context['intern_name'].replace(' ', ' ')} {context['designation'].replace(' ', ' ')}"
+            file_prefix = f"{context['intern_name'].replace(' ', ' ')} - {context['designation'].replace(' ', ' ')}"
             file_upload_details = {
                 "intern": context['intern_name'],
                 "position": context['designation'],
@@ -560,7 +561,7 @@ def handle_internship_certificate():
                         st.success("Now you can download the file:")
                         # Step 2: Show download link only after upload
                         generate_download_link(pdf_output,
-                                               f"{file_prefix} Internship Certificate.pdf",
+                                               f"{file_prefix} - Certificate.pdf",
                                                "PDF", "Internship")
 
                 else:
@@ -581,7 +582,7 @@ def handle_internship_certificate():
                         st.success("Now you can download the file:")
                         # Step 2: Show download link only after upload
                         generate_download_link(docx_output,
-                                               f"{file_prefix} Internship Certificate.docx",
+                                               f"{file_prefix} - Certificate.docx",
                                                "DOCX", "Internship")
 
                 else:
@@ -770,6 +771,7 @@ def handle_internship_offer():
                     st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
                     st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
                     st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+                    st.markdown(f"**Description:** `{selected_metadata.get('description', 'Unknown')} `")
 
                 with tab2:
                     from streamlit.components.v1 import html as st_html
@@ -897,7 +899,7 @@ def handle_internship_offer():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(pdf_output,
-                                           f"{st.session_state.internship_offer_data['intern_name']} {st.session_state.internship_offer_data['position']} offer.pdf",
+                                           f"{st.session_state.internship_offer_data['intern_name']} - {st.session_state.internship_offer_data['position']} - Offer Letter.pdf",
                                            "PDF", "Internship Offer")
 
 
@@ -916,7 +918,7 @@ def handle_internship_offer():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(docx_output,
-                                           f"{st.session_state.internship_offer_data['intern_name']} {st.session_state.internship_offer_data['position']} offer.docx",
+                                           f"{st.session_state.internship_offer_data['intern_name']} - {st.session_state.internship_offer_data['position']} - Offer Letter.docx",
                                            "DOCX", "Offer")
 
         # Clean up temp files
@@ -1100,6 +1102,7 @@ def handle_relieving_letter():
                     st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
                     st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
                     st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+                    st.markdown(f"**Description:** `{selected_metadata.get('description', 'Unknown')} `")
 
                 with tab2:
                     from streamlit.components.v1 import html as st_html
@@ -1253,7 +1256,7 @@ def handle_relieving_letter():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(pdf_output,
-                                           f"{st.session_state.relieving_letter_data['intern_name']} {st.session_state.relieving_letter_data['position']} letter.pdf",
+                                           f"{st.session_state.relieving_letter_data['intern_name']} - {st.session_state.relieving_letter_data['position']} - Relieving Letter.pdf",
                                            "PDF", "Relieving Letter")
 
             with col2:
@@ -1271,7 +1274,7 @@ def handle_relieving_letter():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(docx_output,
-                                           f"{st.session_state.relieving_letter_data['intern_name']} {st.session_state.relieving_letter_data['position']} letter.docx",
+                                           f"{st.session_state.relieving_letter_data['intern_name']} - {st.session_state.relieving_letter_data['position']} - Relieving Letter.docx",
                                            "DOCX", "Relieving Letter")
 
     #     # Clean up temp files
@@ -1309,9 +1312,9 @@ def handle_contract():
         # Step 1: Collect information
         with st.form("contract_form"):
             date = st.date_input("Contract Date", value=default_date)
-            client_company_name = st.text_input("Client Company Name", value=default_client_company_name, placeholder="HVT")
+            client_company_name = st.text_input("Client Company Name", value=default_client_company_name)
             client_name = st.text_input("Client Name", value=default_name, placeholder="Jon Lain")
-            client_company_address = st.text_area("Client Company Address", value=default_client_address, placeholder="2 Street, NY.")
+            client_company_address = st.text_area("Client Company Address", value=default_client_address)
             contract_end = st.date_input("Contract End Date", default_contract_end)
 
             if st.form_submit_button("Select Contract Template"):
@@ -1425,6 +1428,7 @@ def handle_contract():
                     st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
                     st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
                     st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+                    st.markdown(f"**Description:** `{selected_metadata.get('description', 'Unknown')} `")
 
                 with tab2:
                     from streamlit.components.v1 import html as st_html
@@ -1470,13 +1474,32 @@ def handle_contract():
         with st.spinner("Generating contract..."):
             st.button("← Back to Template Select", on_click=lambda: setattr(st.session_state, 'contract_form_step', 2))
 
+            space_ = " "
+            the_name = {st.session_state.contract_data['client_name']}
+            if len(the_name) > 14:
+                new_text = the_name
+            elif len(the_name) < 14:
+                if len(the_name) < 8:
+                    lenght_dif = 11 - len(the_name)
+                    new_text = f"{space_ * lenght_dif}{the_name}"
+                else:
+                    lenght_dif = 14 - len(the_name)
+                    new_text = f"{space_ * lenght_dif}{the_name}"
+            else:
+                new_text = the_name
+
+            date_str = st.session_state.contract_data["contract_end"]
+            contract_end = datetime.strptime(date_str, "%d/%m/%Y")
+            formatted_date = contract_end.strftime("%-d %B, %Y")
            # Generate documents
             replacements_docx = {
                 "date": st.session_state.contract_data["date"],
                 "client_company_name": st.session_state.contract_data["client_company_name"],
-                "client_name": f"        {st.session_state.contract_data['client_name']}",
+                # "client_name": f"        {st.session_state.contract_data['client_name']}",
+                "client_name": f"{new_text}",
                 "client_address": st.session_state.contract_data["client_company_address"],
-                "contract_end": st.session_state.contract_data["contract_end"],
+                # "contract_end": st.session_state.contract_data["contract_end"],
+                "contract_end": formatted_date,
             }
 
             # Get template from Firestore
@@ -1541,7 +1564,7 @@ def handle_contract():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(pdf_output,
-                                           f"{st.session_state.contract_data['client_name']} {st.session_state.contract_data['client_company_name']} contract.pdf",
+                                           f"{st.session_state.contract_data['client_name']} - {st.session_state.contract_data['client_company_name']} - Contract.pdf",
                                            "PDF", "Contract")
 
 
@@ -1560,7 +1583,7 @@ def handle_contract():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(docx_output,
-                                           f"{st.session_state.contract_data['client_name']} {st.session_state.contract_data['client_company_name']} contract.docx",
+                                           f"{st.session_state.contract_data['client_name']} - {st.session_state.contract_data['client_company_name']} - Contract.docx",
                                            "DOCX", "Contract")
     #
     #     # Clean up temp files
@@ -1709,6 +1732,7 @@ def handle_nda():
                     st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
                     st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
                     st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+                    st.markdown(f"**Description:** `{selected_metadata.get('description', 'Unknown')} `")
 
                 with tab2:
                     from streamlit.components.v1 import html as st_html
@@ -1868,7 +1892,7 @@ def handle_nda():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(pdf_output,
-                                           f"{st.session_state.nda_data['client_name']} {st.session_state.nda_data['client_company_name']} nda.pdf",
+                                           f"{st.session_state.nda_data['client_name']} - {st.session_state.nda_data['client_company_name']} - NDA.pdf",
                                            "PDF", "Contract")
 
             with col2:
@@ -1885,7 +1909,7 @@ def handle_nda():
                     st.success("Now you can download the file:")
                     # Step 2: Show download link only after upload
                     generate_download_link(docx_output,
-                                           f"{st.session_state.nda_data['client_name']} {st.session_state.nda_data['client_company_name']} contract.docx",
+                                           f"{st.session_state.nda_data['client_name']} - {st.session_state.nda_data['client_company_name']} - NDA.docx",
                                            "DOCX", "NDA")
 
     #
