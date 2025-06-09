@@ -347,7 +347,7 @@ def handle_internship_certificate():
         doc_type = "Internship Certificate"
         template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
         # templates = template_ref.collection("templates").order_by("upload_timestamp", direction="DESCENDING").get()
-        templates = template_ref.collection("templates").order_by("order", direction="DESCENDING").get()
+        templates = template_ref.collection("templates").order_by("order", direction="ASCENDING").get()
 
         available_templates = []
         for t in templates:
