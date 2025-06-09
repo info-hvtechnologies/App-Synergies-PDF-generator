@@ -1475,7 +1475,7 @@ def handle_contract():
             st.button("← Back to Template Select", on_click=lambda: setattr(st.session_state, 'contract_form_step', 2))
 
             space_ = " "
-            the_name = {st.session_state.contract_data['client_name']}
+            the_name = st.session_state.contract_data['client_name']
             if len(the_name) > 14:
                 new_text = the_name
             elif len(the_name) < 14:
@@ -1496,7 +1496,7 @@ def handle_contract():
                 "date": st.session_state.contract_data["date"],
                 "client_company_name": st.session_state.contract_data["client_company_name"],
                 # "client_name": f"        {st.session_state.contract_data['client_name']}",
-                "client_name": f"{new_text}",
+                "client_name": new_text,
                 "client_company_address": st.session_state.contract_data["client_company_address"],
                 # "contract_end": st.session_state.contract_data["contract_end"],
                 "contract_end": formatted_date,
