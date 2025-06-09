@@ -691,7 +691,7 @@ if selected_option == "Admin Panel":
                                 new_order = st.number_input(
                                     "Order",
                                     min_value=0,
-                                    value=int(template_data.get("oder", 0)),
+                                    value=int(template_data.get("order", 0)),
                                     key=f"order_{doc_id}",
                                     disabled=not st.session_state[f"edit_mode_{doc_id}"]
                                 )
@@ -909,7 +909,7 @@ if selected_option == "Admin Panel":
                             new_order = st.number_input(
                                 "Order",
                                 min_value=0,
-                                value=int(template_data.get("oder", 0)),
+                                value=int(template_data.get("order", 0)),
                                 key=f"order_{doc_id}",
                                 disabled=not st.session_state[f"edit_mode_{doc_id}"]
                             )
