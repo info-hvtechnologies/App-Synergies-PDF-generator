@@ -1497,7 +1497,7 @@ def handle_contract():
                 "client_company_name": st.session_state.contract_data["client_company_name"],
                 # "client_name": f"        {st.session_state.contract_data['client_name']}",
                 "client_name": f"{new_text}",
-                "client_address": st.session_state.contract_data["client_company_address"],
+                "client_company_address": st.session_state.contract_data["client_company_address"],
                 # "contract_end": st.session_state.contract_data["contract_end"],
                 "contract_end": formatted_date,
             }
