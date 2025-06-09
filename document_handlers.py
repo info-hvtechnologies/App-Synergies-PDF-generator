@@ -673,7 +673,7 @@ def handle_internship_offer():
     elif st.session_state.internship_offer_form_step == 2:
         st.subheader("Select Offer Template")
 
-        st.button("← Back", on_click=lambda: setattr(st.session_state, 'form_step', 1))
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'internship_offer_form_step', 1))
 
         # Create temp directory
         import os
@@ -1003,7 +1003,7 @@ def handle_relieving_letter():
     elif st.session_state.relieving_letter_form_step == 2:
         st.subheader("Select Letter Template")
 
-        st.button("← Back", on_click=lambda: setattr(st.session_state, 'form_step', 1))
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'relieving_letter_form_step', 1))
 
         # Create temp directory
         import os
@@ -1142,7 +1142,7 @@ def handle_relieving_letter():
         # st.session_state.selected_letter_template_path
         # Step 2: Preview and download
         with st.spinner("Loading template and generating letter..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'relieving_letter_form_step', 2))
+            st.button("← Back to Select Template", on_click=lambda: setattr(st.session_state, 'relieving_letter_form_step', 2))
 
             # Generate documents
             replacements_docx = {
@@ -1468,7 +1468,7 @@ def handle_contract():
         # st.success("NDA generated successfully!")
         # st.session_state.selected_contract_template_path
         with st.spinner("Generating contract..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'contract_form_step', 2))
+            st.button("← Back to Template Select", on_click=lambda: setattr(st.session_state, 'contract_form_step', 2))
 
            # Generate documents
             replacements_docx = {
@@ -1751,7 +1751,7 @@ def handle_nda():
         # Step 2: Preview and download
         # st.success("NDA generated successfully!")
         with st.spinner("Generating agreement..."):
-            st.button("← Back to Form", on_click=lambda: setattr(st.session_state, 'nda_form_step', 2))
+            st.button("← Back to Template Select", on_click=lambda: setattr(st.session_state, 'nda_form_step', 2))
 
             the_name = st.session_state.nda_data['client_name']
             space_ = " "
