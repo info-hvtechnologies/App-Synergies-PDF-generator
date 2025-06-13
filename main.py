@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 import streamlit as st
 from dotenv import load_dotenv
 from firebase_conf import auth, rt_db, bucket, firestore_db
-from document_handlers import (handle_internship_certificate, handle_internship_offer, handle_relieving_letter, handle_nda,
-                               handle_contract, handle_proposal)
+from document_handlers import (handle_internship_certificate, handle_internship_offer, handle_relieving_letter,
+                               handle_nda,
+                               handle_contract, handle_proposal, handle_invoice)
 from google.cloud import firestore
 from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 import tempfile
@@ -87,6 +88,7 @@ DOCUMENT_TYPES = [
     "Relieving Letter",
     # "NDA",
     # "Contract",
+    "Project Invoice",
     "Project Contract",
     "Project NDA",
     "Proposal",
@@ -141,7 +143,7 @@ if selected_option == "Admin Panel":
 
             doc_type = st.selectbox(
                 "Select Document Type",
-                ["Internship Certificate", "Internship Offer", "Relieving Letter","Project Contract",
+                ["Internship Certificate", "Internship Offer", "Relieving Letter", "Project Invoice", "Project Contract",
                  "Project NDA", "Proposal"],
                 key="doc_type_select"
             )
@@ -1249,12 +1251,13 @@ if selected_option == "Admin Panel":
         #      # "Proposal",
         #      "Internship Positions"
         #      ])
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
             ["Internship Certificate",
              "Internship Offer",
              "Relieving Letter",
              # "NDA",
              # "Contract",
+             "Project Invoice",
              "Project Contract",
              "Project NDA",
              "Proposal",
@@ -1279,15 +1282,18 @@ if selected_option == "Admin Panel":
         #     show_templates_tab("Contract")
 
         with tab4:
-            show_templates_tab("Project Contract")
+            show_templates_tab("Project Invoice")
 
         with tab5:
-            show_templates_tab("Project NDA")
+            show_templates_tab("Project Contract")
 
         with tab6:
-            show_templates_tab("Proposal")
+            show_templates_tab("Project NDA")
 
         with tab7:
+            show_templates_tab("Proposal")
+
+        with tab8:
             manage_internship_roles_tab()
 
 
@@ -1303,12 +1309,13 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
     #     "Contract",
     #     "Proposal"
     # ])
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "Internship",
         "Internship Offer",
         "Relieving Letter",
         # "NDA",
         # "Contract",
+        "Project Invoice",
         "Project Contract",
         "Project NDA",
         "Proposal"
@@ -1453,10 +1460,11 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
                                     "Internship": "Internship Certificate",
                                     "Offer": "Internship Offer",
                                     "Relieving Letter": "Relieving Letter",
-                                    "NDA": "NDA",
-                                    "Contract": "Contract",
-                                    "Project Contract": "Project Contract",
-                                    "Project NDA": "Project NDA",
+                                    # "NDA": "NDA",
+                                    # "Contract": "Contract",
+                                    "Project Invoice": "Project Invoice",
+                                    "Contract": "Project Contract",
+                                    "NDA": "Project NDA",
                                     "Proposal": "Proposal"
                                 }
                                 # print("here-----------")
@@ -1531,12 +1539,15 @@ elif selected_option == "History" and st.session_state.get('is_admin', False):
     #     display_documents_by_type("Contract")
 
     with tab4:
-        display_documents_by_type("Project Contract")
+        display_documents_by_type("Project Invoice")
 
     with tab5:
-        display_documents_by_type("Project NDA")
+        display_documents_by_type("Contract")
 
     with tab6:
+        display_documents_by_type("NDA")
+
+    with tab7:
         display_documents_by_type("Proposal")
 
 # Handle document types
@@ -1554,6 +1565,9 @@ elif selected_option == "Relieving Letter":
 #
 # elif selected_option == "Contract":
 #     handle_contract()
+
+elif selected_option == "Project Invoice":
+    handle_invoice()
 
 elif selected_option == "Project Contract":
     handle_contract()

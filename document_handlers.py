@@ -1893,7 +1893,7 @@ def handle_nda():
                     # Step 2: Show download link only after upload
                     generate_download_link(pdf_output,
                                            f"{st.session_state.nda_data['client_name']} - {st.session_state.nda_data['client_company_name']} - NDA.pdf",
-                                           "PDF", "Contract")
+                                           "PDF", "NDA")
 
             with col2:
 
@@ -1910,7 +1910,7 @@ def handle_nda():
                     # Step 2: Show download link only after upload
                     generate_download_link(docx_output,
                                            f"{st.session_state.nda_data['client_name']} - {st.session_state.nda_data['client_company_name']} - NDA.docx",
-                                           "DOCX", "NDA")
+                                           "DOCX", "Project NDA")
 
     #
     #     # Clean up temp files
@@ -1924,6 +1924,349 @@ def handle_nda():
 
 
 def handle_invoice():
+    st.title("📄 Invoice Form")
+    regenerate_data = st.session_state.get('regenerate_data', {})
+    is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Invoice"
+    metadata = regenerate_data.get('metadata', {})
+
+    default_date = datetime.strptime(
+        metadata.get("date", datetime.now().strftime('%d/%m/%Y')), '%d/%m/%Y').date()
+    default_invoice_no = metadata.get("invoice_no", "")
+    default_name = metadata.get("client_name", "")
+    default_email = metadata.get("client_email", "")
+    default_client_company_name = metadata.get("client_company_name", "")
+    default_client_address = metadata.get("client_address", "")
+    default_project_name = metadata.get("project_name", "")
+    default_client_no = metadata.get("client_no", "")
+
+
+    # Initialize session state for multi-page form
+    if 'invoice_form_step' not in st.session_state:
+        st.session_state.invoice_form_step = 1
+        st.session_state.invoice_data = {}
+
+    if st.session_state.invoice_form_step == 1:
+        # Step 1: Collect information
+        with st.form("invoice_form"):
+            date = st.date_input("Invoice Date", value=default_date)
+            invoice_no = st.text_input("Invoice Number", value=default_name)
+            project_name = st.text_input("Project Name", value=default_project_name)
+            client_name = st.text_input("Client Name", value=default_name)
+            client_email = st.text_input("Email", value=default_email)
+            client_no = st.text_input("Client Phone Number", value=default_client_no)
+            client_company_name = st.text_input("Client Company Name", value=default_client_company_name)
+            client_address = st.text_area("Client Company Address", value=default_client_address)
+
+
+            if st.form_submit_button("Generate Invoice"):
+                st.session_state.invoice_data = {
+                    "date": f"{date.day}-{date.month}-{date.year}",
+                    "invoice_no": invoice_no,
+                    "client_company_name": client_company_name,
+                    "client_email": client_email,
+                    "client_name": client_name,
+                    "client_no": client_no,
+                    "client_address": client_address,
+                    "project_name": project_name,
+                }
+                st.session_state.invoice_form_step = 2
+                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    elif st.session_state.invoice_form_step == 2:
+        st.subheader("Select Invoice Template")
+
+        st.button("← Back", on_click=lambda: setattr(st.session_state, 'invoice_form_step', 1))
+
+        # Create temp directory
+        import os
+        temp_dir = os.path.join(tempfile.gettempdir(), "as_invoice")
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_dir = os.path.join(tempfile.gettempdir(), "as_invoice")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        doc_type = "Project Invoice"
+        template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+        # templates = template_ref.collection("templates").order_by("upload_timestamp", direction="DESCENDING").get()
+        templates = template_ref.collection("templates").order_by("order", direction="ASCENDING").get()
+
+        available_templates = []
+        for t in templates:
+            t_data = t.to_dict()
+            if (
+                    t_data.get("visibility") == "Public" and
+                    t_data.get(
+                        "file_type") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and
+                    t_data.get("storage_path")
+            ):
+                blob = bucket.blob(t_data["storage_path"])
+                if blob.exists():
+                    available_templates.append({"doc": t, "metadata": t_data})
+                else:
+                    print(f"❌ Skipping missing file: {t_data['storage_path']}")
+
+        if not available_templates:
+            st.error("No valid public templates available.")
+            st.stop()
+
+        # Build selection options using display_name as primary, falling back to original_name
+        certificate_options = {
+            tpl["metadata"].get("display_name") or tpl["metadata"].get("original_name", f"Template {i + 1}"): tpl
+            for i, tpl in enumerate(available_templates)
+        }
+
+        st.markdown("""
+            <style>
+                div[data-baseweb="select"] > div {
+                    width: 100% !important;
+                }
+                .custom-select-container {
+                    max-width: 600px;
+                    margin-bottom: 1rem;
+                }
+                .metadata-container {
+                    border: 1px solid #e1e4e8;
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin-top: 16px;
+                    background-color: #f6f8fa;
+                }
+                .metadata-row {
+                    display: flex;
+                    margin-bottom: 8px;
+                }
+                .metadata-label {
+                    font-weight: 600;
+                    min-width: 120px;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns([5, 1])
+
+        with col1:
+            selected_name = st.selectbox(
+                "Choose an invoice style:",
+                options=list(certificate_options.keys()),
+                index=0,
+                key="certificate_template_select"
+            )
+
+            selected_template = certificate_options[selected_name]
+            selected_metadata = selected_template["metadata"]
+            selected_storage_path = selected_metadata["storage_path"]
+
+            # Download the selected template
+            template_path = os.path.join(temp_dir, "selected_template.docx")
+            blob = bucket.blob(selected_storage_path)
+            blob.download_to_filename(template_path)
+
+            # Store for later use
+            st.session_state.selected_invoice_template_path = template_path
+
+            # Enhanced metadata display
+            with st.expander("📄 Template Details", expanded=True):
+                tab1, tab2 = st.tabs(["Overview", "Full Metadata"])
+
+                with tab1:
+                    st.markdown(f"**Display Name:** `{selected_metadata.get('display_name', 'Not specified')}`")
+                    st.markdown(f"**Original Filename:** `{selected_metadata.get('original_name', 'Unknown')}`")
+                    st.markdown(f"**Upload Date:** `{selected_metadata.get('upload_date', 'Unknown')}`")
+                    st.markdown(f"**File Size:** `{selected_metadata.get('size_kb', 'Unknown')} KB`")
+                    st.markdown(f"**Description:** `{selected_metadata.get('description', 'Unknown')} `")
+
+                with tab2:
+                    from streamlit.components.v1 import html as st_html
+
+                    pretty_metadata = {
+                        k: truncate_value(v) for k, v in selected_metadata.items()
+                        if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    }
+
+                    html_output = "<div style='font-family: monospace; font-size: 14px;'>{</br>" + dict_to_colored_html(
+                        pretty_metadata) + "}</div>"
+
+                    st_html(html_output, height=400, scrolling=True)
+
+                    # display_metadata = {
+                    #     k: v for k, v in selected_metadata.items()
+                    #     if k not in ['download_url', 'storage_path', 'upload_timestamp']
+                    # }
+                    # st.json(display_metadata)
+
+            # Show PDF preview if available
+            if selected_metadata.get('has_pdf_preview', False):
+                # if st.button("👁️ Show Preview"):
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                        pdf_blob = bucket.blob(selected_metadata['pdf_storage_path'])
+                        pdf_blob.download_to_filename(tmp_file.name)
+                        # pdf_view()
+                        pdf_view(tmp_file.name)
+                except Exception as e:
+                    st.error(f"Failed to load preview: {str(e)}")
+            else:
+                st.write(f"Preview file unavailable.")
+
+        if st.button("Generate Invoice Documents"):
+            st.session_state.invoice_form_step = 3
+            st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+
+    elif st.session_state.invoice_form_step == 3:
+        # Step 2: Preview and download
+        # st.success("NDA generated successfully!")
+        with st.spinner("Generating invoice..."):
+            st.button("← Back to Template Select", on_click=lambda: setattr(st.session_state, 'invoice_form_step', 2))
+
+
+            # Generate documents
+            replacements_docx = {
+                "invoice_date": st.session_state.invoice_data["date"],
+                "client_name": f" {st.session_state.invoice_data['client_name']}",
+                # "client_name": new_text,
+                "company_name": st.session_state.invoice_data["client_company_name"],
+                "client_no": st.session_state.invoice_data["client_no"],
+                "client_address": st.session_state.invoice_data["client_address"],
+                "project_name": st.session_state.invoice_data["project_name"],
+                "client_email": st.session_state.invoice_data["client_email"],
+                "invoice_no": st.session_state.invoice_data["invoice_no"],
+            }
+
+
+            # Get template from Firestore
+            doc_type = "Project Invoice"  # Changed to match your collection name
+            try:
+                # template_ref = firestore_db.collection("AS_DOC_Gen").document(doc_type)
+                # templates = template_ref.collection("templates").order_by("order_number").limit(1).get()
+                #
+                # if not templates:
+                #     st.error("No templates found in the database for Internship Offer")
+                #     return
+                #
+                # # Get the first template (order_number = 1)
+                #
+                # template_doc = templates[0]
+                # template_data = template_doc.to_dict()
+                #
+                # # Visibility check
+                # if template_data.get('visibility', 'Private') != 'Public':
+                #     st.error("This Offer template is not currently available")
+                #     return
+                #
+                # # File type check
+                # if template_data.get(
+                #         'file_type') != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                #     st.error("Template is not a valid Word document (.docx)")
+                #     return
+                #
+                # # Check if storage_path exists
+                # if 'storage_path' not in template_data:
+                #     st.error("Template storage path not found in the database")
+                #     return
+                #
+                # # Download the template file from Firebase Storage
+                # # bucket = storage.bucket()
+                # blob = bucket.blob(template_data['storage_path'])
+                #
+                # # Create a temporary file for the template
+                # with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_template:
+                #     blob.download_to_filename(temp_template.name)
+
+                template_path = st.session_state.selected_invoice_template_path
+
+            except Exception as e:
+                st.error(f"Error fetching template: {str(e)}")
+                return
+
+            # Generate temporary files
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf, \
+                    tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_docx:
+
+                pdf_output = temp_pdf.name
+                docx_output = temp_docx.name
+
+                # Use the downloaded template
+                # offer_edit(template_path, docx_output, replacements_docx)
+                nda_edit(template_path, docx_output, replacements_docx)
+                main_converter(docx_output, pdf_output)
+
+            # Preview section
+            st.subheader("Preview")
+            st.write(f"**Invoice Date:** {st.session_state.invoice_data['date']}")
+            st.write(f"**Invoice No:** {st.session_state.invoice_data['invoice_no']}")
+            st.write(f"**Client Name:** {st.session_state.invoice_data['client_name']}")
+            st.write(f"**Company Name:** {st.session_state.invoice_data['client_company_name']}")
+            st.write(f"**Phone Number:** {st.session_state.invoice_data['client_no']}")
+            st.write(f"**Email:** {st.session_state.invoice_data['client_email']}")
+            st.write(f"**Company Address:** {st.session_state.invoice_data['client_address']}")
+            st.write(f"**Project Name:** {st.session_state.invoice_data['project_name']}")
+
+            # PDF preview (requires pdfplumber)
+            pdf_view(pdf_output)
+
+            # Download buttons
+            st.subheader("Download Documents")
+            col1, col2 = st.columns(2)
+
+            file_upload_details = {
+                "date": st.session_state.invoice_data["date"],
+                "client_company_name": st.session_state.invoice_data["client_company_name"],
+                "client_name": st.session_state.invoice_data['client_name'],
+                "client_address": st.session_state.invoice_data["client_address"],
+                "client_email": st.session_state.invoice_data["client_email"],
+                "client_no": st.session_state.invoice_data["client_no"],
+                "project_name": st.session_state.invoice_data["project_name"],
+                "invoice_no": st.session_state.invoice_data["invoice_no"],
+
+                "upload_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "upload_timestamp": firestore.SERVER_TIMESTAMP,
+            }
+
+            with col1:
+
+                if st.button("✅ Confirm and Upload Invoice PDF", key="upload_pdf"):
+                    save_generated_file_to_firebase_2(
+                        pdf_output,
+                        "Project Invoice",
+                        bucket,
+                        "PDF",
+                        file_upload_details
+                    )
+
+                    st.success("Now you can download the file:")
+                    # Step 2: Show download link only after upload
+                    generate_download_link(pdf_output,
+                                           f"{st.session_state.invoice_data['client_name']} - {st.session_state.invoice_data['client_company_name']} - Invoice.pdf",
+                                           "PDF", "Project Invoice")
+
+            with col2:
+
+                if st.button("✅ Confirm and Upload Invoice DOCX", key="upload_docx"):
+                    save_generated_file_to_firebase_2(
+                        docx_output,
+                        "Project Invoice",
+                        bucket,
+                        "DOCX",
+                        file_upload_details
+                    )
+
+                    st.success("Now you can download the file:")
+                    # Step 2: Show download link only after upload
+                    generate_download_link(docx_output,
+                                           f"{st.session_state.invoice_data['client_name']} - {st.session_state.invoice_data['client_company_name']} - Invoice.docx",
+                                           "DOCX", "Project Invoice")
+
+    #
+    #     # Clean up temp files
+    #     try:
+    #         import os
+    #         os.unlink(template_path)
+    #         os.unlink(pdf_output)
+    #         os.unlink(docx_output)
+    #     except:
+    #         pass
+
+
+def handle_invoice_old():
     st.title("📄 Invoice Generator")
     regenerate_data = st.session_state.get('regenerate_data', {})
     is_regeneration = regenerate_data.get('source') == 'history' and regenerate_data.get('doc_type') == "Internship"

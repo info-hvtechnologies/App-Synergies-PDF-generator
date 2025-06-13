@@ -15,10 +15,14 @@ def nda_edit(input_path, output_path, context):
 
 
 # replacements_docx = {
-#                 "date": "22-3-1290",
-#                 "client_name": "       Diddy",
-#                 "client_company_name": "DAVE",
-#                 "client_company_address": "Ajalejo Street"
+#                 "invoice_date": "22-3-1290",
+#                 "client_name": "Diddy",
+#                 "company_name": "DAVE",
+#                 "client_address":"Ajalejo Street",
+#                 "client_email": "example@email.com",
+#                 "project_name": "Tabby",
+#                 "invoice_no": "987TY345",
+#                 "client_no": "0987655678"
 #             }
-# nda_edit("penny_pig_2.docx", "wowo_8.docx", replacements_docx)
+# nda_edit("app_invoice_1.docx", "wowo_2.docx", replacements_docx)
 
