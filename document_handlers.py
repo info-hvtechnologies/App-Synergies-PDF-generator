@@ -1944,6 +1944,7 @@ def handle_invoice():
     if 'invoice_form_step' not in st.session_state:
         st.session_state.invoice_form_step = 1
         st.session_state.invoice_data = {}
+        st.session_state.amounts_input = {}
 
     if st.session_state.invoice_form_step == 1:
         # Step 1: Collect information
@@ -1957,8 +1958,32 @@ def handle_invoice():
             client_company_name = st.text_input("Client Company Name", value=default_client_company_name)
             client_address = st.text_area("Client Company Address", value=default_client_address)
 
+            st.subheader("Amount Entries")
+
+
+            # Display Amount 1 to 7 in rows of 3 columns
+            # Row 1: Amounts 1–3
+            cols = st.columns(3)
+            amount_inputs = {}
+            for i in range(3):
+                amount_inputs[f"amt{i + 1}"] = cols[i].number_input(
+                    f"Amount {i + 1}", min_value=0, step=1
+                )
+
+            # Row 2: Amounts 4–6
+            cols = st.columns(3)
+            for i in range(3):
+                amount_inputs[f"amt{i + 4}"] = cols[i].number_input(
+                    f"Amount {i + 4}", min_value=0, step=1
+                )
+
+            # Row 3: Amount 7
+            col = st.columns(1)[0]
+            amount_inputs["amt7"] = col.number_input("Amount 7", min_value=0, step=1)
+            st.session_state.amounts_input = amount_inputs
 
             if st.form_submit_button("Generate Invoice"):
+                # print("Amounts Input:", st.session_state.amounts_input)
                 st.session_state.invoice_data = {
                     "date": f"{date.day}-{date.month}-{date.year}",
                     "invoice_no": invoice_no,
@@ -2130,7 +2155,8 @@ def handle_invoice():
                 "client_email": st.session_state.invoice_data["client_email"],
                 "invoice_no": st.session_state.invoice_data["invoice_no"],
             }
-
+            replacements_docx = replacements_docx | st.session_state.amounts_input
+            # print("full dict", replacements_docx)
 
             # Get template from Firestore
             doc_type = "Project Invoice"  # Changed to match your collection name
