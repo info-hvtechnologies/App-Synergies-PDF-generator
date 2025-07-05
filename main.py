@@ -16,7 +16,6 @@ from manage_internship_roles_tab import manage_internship_roles_tab
 from docx_pdf_converter import main_converter
 from load_config import LOAD_LOCALLY
 
-st.set_option('server.enableXsrfProtection', False)
 load_dotenv()
 
 # LOAD_LOCALLY = False
