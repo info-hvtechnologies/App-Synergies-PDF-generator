@@ -4362,8 +4362,19 @@ def handle_proposal():
                     "PDF",
                     file_upload_details
                 )
+
+                st.session_state["proposal_uploaded"] = True
+                st.session_state["proposal_download_path"] = temp_merger_path
+                st.session_state["proposal_filename"] = default_filename
                 st.success("Now you can download the file:")
-                generate_download_link(temp_merger_path, default_filename, "PDF", "Proposal")
+                # generate_download_link(temp_merger_path, default_filename, "PDF", "Proposal")
+                if st.session_state.get("proposal_uploaded"):
+                    generate_download_link(
+                        st.session_state["proposal_download_path"],
+                        st.session_state["proposal_filename"],
+                        "PDF",
+                        "Proposal"
+                    )
 
         with download_col2:
             if st.button("🔁 Start Over"):
