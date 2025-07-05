@@ -1082,7 +1082,7 @@ if selected_option == "Admin Panel":
                         public_url = blob.public_url
                         st.markdown(f"**Download:** [{template_data['original_name']}]({public_url})")
 
-                        blob = bucket.blob(data['storage_path'])
+                        blob = bucket.blob(template_data['storage_path'])
 
                         # Download to a temporary file
                         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
