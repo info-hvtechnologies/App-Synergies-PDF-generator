@@ -870,9 +870,15 @@ if selected_option == "Admin Panel":
                             # st.markdown(
                             #     f"**Download:** [{template_data['original_name']}]({template_data['download_url']})")
                             blob = bucket.blob(template_data['storage_path'])
-                            blob.make_public()
-                            public_url = blob.public_url
-                            st.markdown(f"**Download:** [{template_data['original_name']}]({public_url})")
+
+                            # Generate a signed URL valid for 1 hour
+                            url = blob.generate_signed_url(
+                                version="v4",
+                                expiration=timedelta(hours=1),
+                                method="GET"
+                            )
+
+                            st.markdown(f"**Download:** [{template_data['original_name']}]({url})")
 
             else:
                 # templates = template_ref.collection("templates").order_by("upload_timestamp",
