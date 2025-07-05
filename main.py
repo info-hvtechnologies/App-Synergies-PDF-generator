@@ -1067,10 +1067,27 @@ if selected_option == "Admin Panel":
                         st.markdown(f"**File Type:** {template_data.get('file_type', 'Unknown')}")
                         # st.markdown(
                         #     f"**Download:** [{template_data['original_name']}]({template_data['download_url']})")
-                        blob = bucket.blob(template_data['storage_path'])
-                        blob.make_public()
-                        public_url = blob.public_url
-                        st.markdown(f"**Download:** [{template_data['original_name']}]({public_url})")
+                        # blob = bucket.blob(template_data['storage_path'])
+                        # blob.make_public()
+                        # public_url = blob.public_url
+                        # st.markdown(f"**Download:** [{template_data['original_name']}]({public_url})")
+
+                        blob = bucket.blob(data['storage_path'])
+
+                        # Download to a temporary file
+                        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                            blob.download_to_filename(tmp_file.name)
+
+                        with open(tmp_file.name, "rb") as file:
+                            file_bytes = file.read()
+
+                        st.download_button(
+                            label="⬇️ Download",
+                            data=file_bytes,
+                            file_name=data.get("name", "document.pdf"),
+                            mime="application/octet-stream",  # You can change MIME type if known
+                            key=f"download_{doc_id}"
+                        )
 
 
         # def show_templates_tab(doc_type):
