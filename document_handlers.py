@@ -4381,5 +4381,5 @@ def handle_proposal():
                 for key in ['proposal_form_step', 'proposal_data', 'selected_br']:
                     if key in st.session_state:
                         del st.session_state[key]
-                st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+        st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
 
