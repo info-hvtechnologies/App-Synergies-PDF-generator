@@ -4354,15 +4354,32 @@ def handle_proposal():
         with download_col1:
             default_filename = f"{st.session_state.proposal_data['client_name'].replace(' ', '_')}_Proposal.pdf"
 
-            if st.button("✅ Confirm and Upload Proposal"):
-                save_generated_file_to_firebase_2(
-                    temp_merger_path,
-                    "Proposal",
-                    bucket,
-                    "PDF",
-                    file_upload_details
-                )
-                st.success("Now you can download the file:")
+            # if st.button("✅ Confirm and Upload Proposal"):
+            #     save_generated_file_to_firebase_2(
+            #         temp_merger_path,
+            #         "Proposal",
+            #         bucket,
+            #         "PDF",
+            #         file_upload_details
+            #     )
+            #     st.success("Now you can download the file:")
+            #     generate_download_link(temp_merger_path, default_filename, "PDF", "Proposal")
+            if "proposal_uploaded" not in st.session_state:
+                st.session_state.proposal_uploaded = False
+
+            if not st.session_state.proposal_uploaded:
+                if st.button("✅ Confirm and Upload Proposal"):
+                    save_generated_file_to_firebase_2(
+                        temp_merger_path,
+                        "Proposal",
+                        bucket,
+                        "PDF",
+                        file_upload_details
+                    )
+                    st.session_state.proposal_uploaded = True
+                    st.experimental_rerun() if LOAD_LOCALLY else st.rerun()
+            else:
+                st.success("Proposal uploaded successfully. Now you can download it:")
                 generate_download_link(temp_merger_path, default_filename, "PDF", "Proposal")
 
         with download_col2:
