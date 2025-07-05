@@ -1067,10 +1067,10 @@ if selected_option == "Admin Panel":
                         st.markdown(f"**File Type:** {template_data.get('file_type', 'Unknown')}")
                         # st.markdown(
                         #     f"**Download:** [{template_data['original_name']}]({template_data['download_url']})")
-                        # blob = bucket.blob(template_data['storage_path'])
-                        # blob.make_public()
-                        # public_url = blob.public_url
-                        # st.markdown(f"**Download:** [{template_data['original_name']}]({public_url})")
+                        blob = bucket.blob(template_data['storage_path'])
+                        blob.make_public()
+                        public_url = blob.public_url
+                        st.markdown(f"**Download:** [{template_data['original_name']}]({public_url})")
 
                         blob = bucket.blob(data['storage_path'])
 
